@@ -38,7 +38,7 @@ Edit `~/.claude/settings.json` and add the hooks:
         "hooks": [
           {
             "type": "command",
-            "command": "source ~/.claude/env && python ~/.claude/skills/sync-claude-sessions/scripts/claude-sessions sync",
+            "command": ". ~/.claude/env && python ~/.claude/skills/sync-claude-sessions/scripts/claude-sessions sync",
             "timeout": 10
           }
         ]
@@ -50,7 +50,7 @@ Edit `~/.claude/settings.json` and add the hooks:
         "hooks": [
           {
             "type": "command",
-            "command": "source ~/.claude/env && python ~/.claude/skills/sync-claude-sessions/scripts/claude-sessions sync",
+            "command": ". ~/.claude/env && python ~/.claude/skills/sync-claude-sessions/scripts/claude-sessions sync",
             "timeout": 10
           }
         ]

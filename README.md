@@ -65,7 +65,7 @@ This is the only file that differs per PC. All hooks source it automatically.
         "hooks": [
           {
             "type": "command",
-            "command": "source ~/.claude/env && python ~/.claude/skills/sync-claude-sessions/scripts/claude-sessions sync",
+            "command": ". ~/.claude/env && python ~/.claude/skills/sync-claude-sessions/scripts/claude-sessions sync",
             "timeout": 10
           }
         ]
@@ -77,7 +77,7 @@ This is the only file that differs per PC. All hooks source it automatically.
         "hooks": [
           {
             "type": "command",
-            "command": "source ~/.claude/env && python ~/.claude/skills/sync-claude-sessions/scripts/claude-sessions sync",
+            "command": ". ~/.claude/env && python ~/.claude/skills/sync-claude-sessions/scripts/claude-sessions sync",
             "timeout": 10
           }
         ]
@@ -101,7 +101,7 @@ This is the only file that differs per PC. All hooks source it automatically.
 ### 3. (Optional) QMD for topic search
 
 ```bash
-source ~/.claude/env
+. ~/.claude/env
 cd "$VAULT_DIR"
 qmd collection add Claude-Sessions --name sessions
 qmd update
