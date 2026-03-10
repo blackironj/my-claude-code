@@ -42,6 +42,27 @@ You can auto-index sessions into QMD on every session end via a Claude Code hook
 
 Graph options: `--min-files 5` for cleaner graphs (only sessions touching 5+ files), `--all-projects` to scan beyond current vault.
 
+## Commands (MUST use these scripts - do NOT craft raw bash commands)
+
+**Temporal** (date queries → recall-day.py):
+```bash
+python3 ~/.claude/skills/recall/scripts/recall-day.py list DATE_EXPR
+python3 ~/.claude/skills/recall/scripts/recall-day.py expand SESSION_ID
+```
+
+**Topic** (keyword queries → qmd search with query expansion):
+```bash
+qmd search "VARIANT_1" -c sessions -n 5
+qmd search "VARIANT_2" -c sessions -n 5
+qmd search "VARIANT_1" -c notes -n 5
+qmd get "qmd://collection/path/to/file.md" -l 50
+```
+
+**Graph** (strip "graph" prefix, pass rest as DATE_EXPR):
+```bash
+python3 ~/.claude/skills/recall/scripts/session-graph.py DATE_EXPR
+```
+
 ## Workflow
 
-See `workflows/recall.md` for routing logic and step-by-step process.
+See `workflows/recall.md` for full routing logic, query classification, and presentation rules.

@@ -57,7 +57,9 @@ def extract_text(content) -> str:
 
 
 def local_tz() -> timezone:
-    """Get local timezone offset."""
+    """Get local timezone offset (DST-aware)."""
     import time as _time
-    offset = timedelta(seconds=-_time.timezone if _time.daylight == 0 else -_time.altzone)
+    # tm_isdst > 0 means DST is currently active; use altzone in that case
+    is_dst = _time.localtime().tm_isdst > 0
+    offset = timedelta(seconds=-(_time.altzone if is_dst else _time.timezone))
     return timezone(offset)

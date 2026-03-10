@@ -378,6 +378,8 @@ def parse_frontmatter(content: str) -> dict:
                 frontmatter[current_key] = "\n".join(multiline_value).rstrip()
                 in_multiline = False
                 multiline_value = []
+                current_array = None
+                # Fall through to re-process this line as a key-value pair
 
         # Array item
         if line.startswith("  - "):
@@ -402,7 +404,7 @@ def parse_frontmatter(content: str) -> dict:
                 current_array = None
             elif value == "" or value == "[]":
                 current_array = key
-                frontmatter[key] = [] if value == "[]" else value
+                frontmatter[key] = []
             else:
                 current_array = None
                 if value.startswith('"') and value.endswith('"'):
@@ -629,14 +631,17 @@ def _spawn_title_gen(jsonl_path: str, md_path: str):
     env.pop("CLAUDECODE", None)
     try:
         log_path = Path.home() / ".claude" / "hooks" / "title-gen.log"
+        log_path.parent.mkdir(parents=True, exist_ok=True)
         log_fd = open(log_path, "a")
-        subprocess.Popen(
+        proc = subprocess.Popen(
             [sys.executable, str(script_path), "--jsonl", jsonl_path, "--md", md_path],
             start_new_session=True,
             stdout=log_fd,
             stderr=subprocess.STDOUT,
+            stdin=subprocess.DEVNULL,
             env=env,
         )
+        # Close parent's copy of FD after Popen — child already inherited it via fork
         log_fd.close()
     except Exception:
         pass  # Best-effort
@@ -661,6 +666,11 @@ def sync_session(session_id: str, transcript_path: str | None = None, quiet: boo
 
     data = extract_session_data(records)
     data["session_id"] = session_id
+
+    # Skip ghost sessions — JSONL files with no meaningful user messages
+    # (e.g., only file-history-snapshot records, or all isMeta)
+    if not data["user_messages"]:
+        return None
 
     existing_file = find_session_file(session_id)
 
@@ -698,8 +708,10 @@ def sync_session(session_id: str, transcript_path: str | None = None, quiet: boo
         print(f"Synced: {output_file}")
 
     # Spawn background LLM title generation if needed
+    # Use meaningful message count (not total records which includes isMeta)
     title_source = existing_fm.get("title_source", "auto") if existing_fm else "auto"
-    if data["messages"] >= 5 and title_source == "auto":
+    meaningful_msgs = len(data["user_messages"])
+    if meaningful_msgs >= 5 and title_source == "auto":
         _spawn_title_gen(str(jsonl_path), str(output_file))
 
     return output_file
@@ -902,7 +914,7 @@ def cmd_sync(args):
         return 0
 
     result = sync_session(session_id, transcript_path, quiet=args.quiet)
-    return 0
+    return 0 if result else 1
 
 
 def _find_all_project_sessions(cutoff: float | None = None) -> list[Path]:

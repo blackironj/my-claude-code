@@ -17,7 +17,7 @@ import json
 import os
 import re
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from pathlib import Path
 
 # Add scripts dir to path for common module
@@ -49,10 +49,10 @@ def parse_date_expr(expr: str) -> tuple[datetime, datetime]:
         start = today_start - timedelta(days=1)
         return start, today_start
 
-    # YYYY-MM-DD
+    # YYYY-MM-DD — use local timezone (consistent with other date expressions)
     m = re.match(r'^(\d{4})-(\d{2})-(\d{2})$', expr)
     if m:
-        d = datetime(int(m.group(1)), int(m.group(2)), int(m.group(3)), tzinfo=timezone.utc)
+        d = datetime(int(m.group(1)), int(m.group(2)), int(m.group(3)), tzinfo=local_tz)
         return d, d + timedelta(days=1)
 
     # "N days ago"
