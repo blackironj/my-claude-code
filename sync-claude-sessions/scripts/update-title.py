@@ -118,7 +118,7 @@ def generate_title(messages: list[str], assistant_lines: list[str]) -> str | Non
         # Allow running claude inside a Claude Code session (SessionEnd hook)
         env.pop("CLAUDECODE", None)
         result = subprocess.run(
-            ["claude", "-p", "--model", "haiku"],
+            ["claude", "-p", "--model", "haiku", "--no-session-persistence"],
             input=prompt,
             capture_output=True,
             text=True,
