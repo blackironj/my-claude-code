@@ -20,57 +20,16 @@ import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-CLAUDE_PROJECTS = Path.home() / ".claude" / "projects"
+# Add scripts dir to path for common module
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from common import STRIP_PATTERNS, clean_content, extract_text, local_tz as _local_tz
 
-# Patterns to strip from user messages (keep in sync with claude-sessions sync script)
-STRIP_PATTERNS = [
-    re.compile(r'<system-reminder>.*?</system-reminder>', re.DOTALL),
-    re.compile(r'<local-command-caveat>.*?</local-command-caveat>', re.DOTALL),
-    re.compile(r'<local-command-stdout>.*?</local-command-stdout>', re.DOTALL),
-    re.compile(r'<command-name>.*?</command-name>\s*<command-message>.*?</command-message>\s*(?:<command-args>.*?</command-args>)?', re.DOTALL),
-    re.compile(r'<command-message>.*?</command-message>', re.DOTALL),
-    re.compile(r'<command-name>.*?</command-name>', re.DOTALL),
-    re.compile(r'<command-args>.*?</command-args>', re.DOTALL),
-    re.compile(r'<task-notification>.*?</task-notification>', re.DOTALL),
-    re.compile(r'<teammate-message[^>]*>.*?</teammate-message>', re.DOTALL),
-    re.compile(r'<ide_opened_file>.*?</ide_opened_file>', re.DOTALL),
-]
+CLAUDE_PROJECTS = Path.home() / ".claude" / "projects"
 
 DAY_NAMES = {
     'monday': 0, 'tuesday': 1, 'wednesday': 2, 'thursday': 3,
     'friday': 4, 'saturday': 5, 'sunday': 6,
 }
-
-
-def clean_content(text: str) -> str:
-    """Strip system tags, keep only human-written content."""
-    if not isinstance(text, str):
-        return ""
-    for pat in STRIP_PATTERNS:
-        text = pat.sub('', text)
-    return text.strip()
-
-
-def extract_text(content) -> str:
-    """Extract text from message content (string or list of content blocks)."""
-    if isinstance(content, str):
-        return content
-    if isinstance(content, list):
-        parts = []
-        for block in content:
-            if isinstance(block, dict) and block.get('type') == 'text':
-                parts.append(block.get('text', ''))
-            elif isinstance(block, str):
-                parts.append(block)
-        return '\n'.join(parts)
-    return ""
-
-
-def _local_tz() -> timezone:
-    """Get local timezone offset."""
-    import time
-    offset = timedelta(seconds=-time.timezone if time.daylight == 0 else -time.altzone)
-    return timezone(offset)
 
 
 def parse_date_expr(expr: str) -> tuple[datetime, datetime]:

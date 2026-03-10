@@ -133,7 +133,7 @@ def extract_file_paths(jsonl_path: Path) -> dict | None:
                 ts_str = obj.get('timestamp')
                 if ts_str and not start_time:
                     try:
-                        start_time = datetime.fromisoformat(ts_str.replace('Z', '+00:00'))
+                        start_time = datetime.fromisoformat(ts_str.replace('Z', '+00:00')).astimezone(recall_day._local_tz())
                     except (ValueError, TypeError):
                         pass
 
@@ -1140,7 +1140,7 @@ def filter_sessions_by_day(sessions: list, day_filter: str) -> list:
     # Check if it's a date
     m = re.match(r'^(\d{4})-(\d{2})-(\d{2})$', day_filter)
     if m:
-        target = datetime(int(m.group(1)), int(m.group(2)), int(m.group(3)), tzinfo=timezone.utc)
+        target = datetime(int(m.group(1)), int(m.group(2)), int(m.group(3)), tzinfo=recall_day._local_tz())
         return [s for s in sessions
                 if s['start_time'].date() == target.date()]
 
@@ -1180,7 +1180,7 @@ def main():
     for proj_dir in project_dirs:
         for filepath in proj_dir.glob("*.jsonl"):
             try:
-                mtime = datetime.fromtimestamp(filepath.stat().st_mtime, tz=timezone.utc)
+                mtime = datetime.fromtimestamp(filepath.stat().st_mtime, tz=recall_day._local_tz())
                 if mtime < date_start - timedelta(days=1):
                     continue
             except OSError:
@@ -1231,7 +1231,23 @@ def main():
     print(f"Saved to {output_path}")
 
     if not args.no_open:
-        subprocess.run(['open', output_path], check=False)
+        import platform
+        if platform.system() == 'Darwin':
+            subprocess.run(['open', output_path], check=False)
+        elif platform.system() == 'Linux':
+            # WSL: try Windows explorer, fallback to xdg-open
+            if 'microsoft' in platform.release().lower():
+                wsl_path = subprocess.run(
+                    ['wslpath', '-w', output_path], capture_output=True, text=True
+                ).stdout.strip()
+                if wsl_path:
+                    subprocess.run(['explorer.exe', wsl_path], check=False)
+                else:
+                    subprocess.run(['xdg-open', output_path], check=False)
+            else:
+                subprocess.run(['xdg-open', output_path], check=False)
+        else:
+            subprocess.run(['start', output_path], check=False, shell=True)
 
 
 if __name__ == '__main__':

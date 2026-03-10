@@ -21,9 +21,14 @@ import json
 import glob
 import os
 import re
+import sys
 import argparse
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
+
+# Add scripts dir to path for common module
+sys.path.insert(0, str(Path(__file__).parent))
+from common import clean_content, extract_text
 
 def _detect_default_source():
     """Auto-detect Claude project directory from CWD."""
@@ -52,45 +57,6 @@ def _detect_default_output():
 DEFAULT_SOURCE = _detect_default_source()
 DEFAULT_OUTPUT = _detect_default_output()
 DEFAULT_DAYS = 21
-
-# Patterns to strip from user messages (keep in sync with claude-sessions sync script)
-STRIP_PATTERNS = [
-    re.compile(r'<system-reminder>.*?</system-reminder>', re.DOTALL),
-    re.compile(r'<local-command-caveat>.*?</local-command-caveat>', re.DOTALL),
-    re.compile(r'<local-command-stdout>.*?</local-command-stdout>', re.DOTALL),
-    re.compile(r'<command-name>.*?</command-name>\s*<command-message>.*?</command-message>\s*(?:<command-args>.*?</command-args>)?', re.DOTALL),
-    re.compile(r'<command-message>.*?</command-message>', re.DOTALL),
-    re.compile(r'<command-name>.*?</command-name>', re.DOTALL),
-    re.compile(r'<command-args>.*?</command-args>', re.DOTALL),
-    re.compile(r'<task-notification>.*?</task-notification>', re.DOTALL),
-    re.compile(r'<teammate-message[^>]*>.*?</teammate-message>', re.DOTALL),
-    re.compile(r'<ide_opened_file>.*?</ide_opened_file>', re.DOTALL),
-]
-
-
-def extract_text(content) -> str:
-    """Extract text from message content (string or list of content blocks)."""
-    if isinstance(content, str):
-        return content
-    if isinstance(content, list):
-        parts = []
-        for block in content:
-            if isinstance(block, dict) and block.get('type') == 'text':
-                parts.append(block.get('text', ''))
-            elif isinstance(block, str):
-                parts.append(block)
-        return '\n'.join(parts)
-    return ""
-
-
-def clean_content(text: str) -> str:
-    """Strip system tags, keep only human-written content."""
-    if not isinstance(text, str):
-        return ""
-    for pat in STRIP_PATTERNS:
-        text = pat.sub('', text)
-    text = text.strip()
-    return text
 
 
 def derive_title(messages: list[dict]) -> str:
