@@ -212,9 +212,19 @@ def extract_session_data(records: list[dict]) -> dict:
     data["user_messages"] = [clean_text(m) for m in data["user_messages"]]
     data["user_messages"] = [m for m in data["user_messages"] if m]
 
-    if not data["title"] and data["user_messages"]:
-        first_msg = data["user_messages"][0]
-        data["title"] = first_msg.replace("\n", " ").strip()[:80]
+    if data["user_messages"]:
+        # Always derive title from first meaningful user message (after cleaning)
+        for msg in data["user_messages"]:
+            candidate = msg.replace("\n", " ").strip()
+            # Skip skill instructions and short messages
+            if candidate.startswith("Base directory for this skill:"):
+                continue
+            if len(candidate) < 5:
+                continue
+            data["title"] = candidate[:80]
+            break
+    if not data["title"]:
+        data["title"] = "Untitled"
 
     if not data["date"]:
         data["date"] = datetime.now().strftime("%Y-%m-%d")
