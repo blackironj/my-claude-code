@@ -34,13 +34,25 @@ Options:
 - `--min-msgs N` - filter noise (default: 3)
 - `--project PATH` - limit to a specific project (default: scans all projects)
 
-Present the table to the user. If they pick a session to expand:
+Present the table to the user. If they pick a session to expand, offer two depth levels:
+
+**Quick expand** — conversation timeline (user messages, assistant first lines, tool calls):
 
 ```bash
 python3 ~/.claude/skills/recall/scripts/recall-day.py expand SESSION_ID
 ```
 
-This shows the conversation flow (user messages, assistant first lines, tool calls).
+**Deep context** — read the full synced session markdown from Obsidian vault:
+
+```bash
+. ~/.claude/env && ls "$VAULT_DIR/Claude-Sessions/"*SESSION_ID_PREFIX*
+# Then Read the matched file
+```
+
+The Claude-Sessions markdown contains the full conversation, artifacts (created/modified files), and metadata. Use this when the user wants to resume or deeply understand a past session. Match by the 8-char session ID prefix from the list output.
+
+If user says "컨텍스트 줘", "이어서 하고 싶어", "resume", or wants to continue past work → use deep context.
+If user just wants to browse what happened → use quick expand.
 
 ## Step 2B: Topic Recall (QMD BM25 with Query Expansion)
 
@@ -82,7 +94,7 @@ Use the paths returned from Step 2B searches. The `-l 50` flag limits to 50 line
 
 ## Step 4: Present Structured Summary
 
-**For temporal queries:** Present the session table and offer to expand any session.
+**For temporal queries:** Present the session table. Ask: "세션 번호를 선택하면 타임라인을 보여드리고, 깊은 컨텍스트가 필요하면 전체 대화를 로딩합니다." If user picks a session, follow the quick expand / deep context flow from Step 2A.
 
 **For topic queries:** Organize results by collection type:
 
