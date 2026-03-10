@@ -92,53 +92,26 @@ qmd get "qmd://collection/path/to/file.md" -l 50
 
 Use the paths returned from Step 2B searches. The `-l 50` flag limits to 50 lines (adjust if needed for very large files).
 
-## Step 4: Present Structured Summary
+## Step 4: Present Results (Speed First)
 
-**For temporal queries:** Present the session table. Ask: "세션 번호를 선택하면 타임라인을 보여드리고, 깊은 컨텍스트가 필요하면 전체 대화를 로딩합니다." If user picks a session, follow the quick expand / deep context flow from Step 2A.
+**IMPORTANT: Minimize LLM processing. Show script output directly, don't reformat into tables.**
 
-**For topic queries:** Organize results by collection type:
+**For temporal queries:**
+1. Show the script output as-is (it's already a formatted table)
+2. Add one line: "번호 선택 → 타임라인 / 깊은 컨텍스트 로딩 가능"
+3. Add One Thing (one sentence, see below)
 
-**Sessions**
-- What was worked on related to this topic
-- Key dates and decisions
-- Current status or next steps
+That's it. Do NOT re-create the table in markdown, summarize each session, or add commentary.
 
-**Notes**
-- Relevant research findings
-- Plans or proposals
-- Content drafts
+**For topic queries:** Show QMD search results directly, then briefly note top 3 matches with file paths.
 
-**Daily**
-- Recent daily log entries mentioning this topic
-- Timestamps and context
+## Step 5: One Thing (One Sentence)
 
-Keep this concise - it's context loading, not a full report.
+Append one bold sentence based on what has momentum or is closest to done. Skip if not enough signal.
 
-## Step 5: Synthesize "One Thing"
+> **One Thing: [specific action]**
 
-After presenting recall results (temporal, topic, or graph), synthesize the single highest-leverage next action. This replaces generic "what would you like to work on?" with a concrete recommendation.
-
-**How to pick the One Thing:**
-1. Look at what has momentum - sessions with recent activity, things mid-flow
-2. Look at what's blocked - removing a blocker unlocks downstream work
-3. Look at what's closest to done - finishing > starting
-4. Weigh urgency signals: deadlines in session titles, "blocked" status, time-sensitive content
-
-**Format:** Bold line at the end of results:
-
-> **One Thing: [specific, concrete action]**
-
-**Good examples:**
-- **One Thing: Finish the QMD video outline - sections 3-5 are drafted, just needs the closing CTA**
-- **One Thing: Unblock the lab deploy - the DNS config is the only remaining blocker, everything else is ready**
-- **One Thing: Record the video intro - the script and thumbnail are done, recording is the bottleneck**
-
-**Bad examples (too generic):**
-- "Continue working on the video"
-- "Pick up where you left off"
-- "Review recent progress"
-
-If the recall results don't have enough signal to pick a clear One Thing (e.g. user just browsed old sessions with no active work), skip it and ask "What would you like to work on from here?" instead.
+Do NOT explain reasoning, list criteria, or provide multiple options.
 
 ## Fallback: No Results Found
 
