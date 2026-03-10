@@ -905,9 +905,31 @@ def cmd_sync(args):
     return 0
 
 
+def _find_all_project_sessions(cutoff: float | None = None) -> list[Path]:
+    """Scan all project directories for session JSONL files."""
+    projects_dir = Path.home() / ".claude" / "projects"
+    if not projects_dir.is_dir():
+        return []
+    sessions = []
+    for jsonl in projects_dir.glob("**/*.jsonl"):
+        if jsonl.name.startswith("agent-"):
+            continue
+        if jsonl.stat().st_size == 0:
+            continue
+        if cutoff and jsonl.stat().st_mtime < cutoff:
+            continue
+        sessions.append(jsonl)
+    return sessions
+
+
 def cmd_export(args):
     """Export command - batch export sessions."""
-    if args.today:
+    if args.all_projects:
+        cutoff = time.time() - 86400 if args.today else None
+        sessions = _find_all_project_sessions(cutoff)
+        scope = "today (all projects)" if args.today else "all projects"
+        print(f"Found {len(sessions)} sessions from {scope}")
+    elif args.today:
         cutoff = time.time() - 86400
         sessions = [f for f in SESSIONS_DIR.glob("*.jsonl")
                     if f.stat().st_mtime >= cutoff and f.stat().st_size > 0]
@@ -1099,7 +1121,8 @@ def main():
     # export
     p_export = subparsers.add_parser("export", help="Batch export sessions")
     p_export.add_argument("--today", action="store_true", help="Export today's sessions")
-    p_export.add_argument("--all", action="store_true", help="Export all sessions")
+    p_export.add_argument("--all", action="store_true", help="Export all sessions (current project)")
+    p_export.add_argument("--all-projects", action="store_true", help="Export all sessions across all projects")
     p_export.add_argument("file", nargs="?", help="Specific session file")
     p_export.set_defaults(func=cmd_export)
 
