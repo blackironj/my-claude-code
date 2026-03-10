@@ -43,13 +43,17 @@ chmod +x ~/.claude/hooks/index-sessions.sh
 
 ## Configuration
 
-### 1. Set VAULT_DIR (per machine)
-
-Add to `~/.zshrc` or `~/.bashrc`:
+### 1. Create `~/.claude/env` (per machine)
 
 ```bash
-export VAULT_DIR="/path/to/your/obsidian-vault"
+cat > ~/.claude/env << 'EOF'
+# Claude Code environment — sourced by all hooks
+# Change this per machine
+VAULT_DIR="/path/to/your/obsidian-vault"
+EOF
 ```
+
+This is the only file that differs per PC. All hooks source it automatically.
 
 ### 2. Add hooks to `~/.claude/settings.json`
 
@@ -61,7 +65,7 @@ export VAULT_DIR="/path/to/your/obsidian-vault"
         "hooks": [
           {
             "type": "command",
-            "command": "python ~/.claude/skills/sync-claude-sessions/scripts/claude-sessions sync",
+            "command": "source ~/.claude/env && python ~/.claude/skills/sync-claude-sessions/scripts/claude-sessions sync",
             "timeout": 10
           }
         ]
@@ -73,7 +77,7 @@ export VAULT_DIR="/path/to/your/obsidian-vault"
         "hooks": [
           {
             "type": "command",
-            "command": "python ~/.claude/skills/sync-claude-sessions/scripts/claude-sessions sync",
+            "command": "source ~/.claude/env && python ~/.claude/skills/sync-claude-sessions/scripts/claude-sessions sync",
             "timeout": 10
           }
         ]
@@ -97,6 +101,7 @@ export VAULT_DIR="/path/to/your/obsidian-vault"
 ### 3. (Optional) QMD for topic search
 
 ```bash
+source ~/.claude/env
 cd "$VAULT_DIR"
 qmd collection add Claude-Sessions --name sessions
 qmd update

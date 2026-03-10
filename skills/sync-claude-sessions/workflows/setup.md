@@ -15,15 +15,16 @@ cp -r skills/recall ~/.claude/skills/
 cp -r skills/sync-claude-sessions ~/.claude/skills/
 ```
 
-## 2. Set VAULT_DIR
+## 2. Create `~/.claude/env`
 
-Add to your shell profile (`~/.zshrc` or `~/.bashrc`):
+This is the only file that differs per machine:
 
 ```bash
-export VAULT_DIR="/path/to/your/obsidian-vault"
+cat > ~/.claude/env << 'EOF'
+# Claude Code environment — sourced by all hooks
+VAULT_DIR="/path/to/your/obsidian-vault"
+EOF
 ```
-
-This keeps `~/.claude/settings.json` portable across machines — only the shell profile differs per PC.
 
 ## 3. Configure Hooks
 
@@ -37,7 +38,7 @@ Edit `~/.claude/settings.json` and add the hooks:
         "hooks": [
           {
             "type": "command",
-            "command": "python ~/.claude/skills/sync-claude-sessions/scripts/claude-sessions sync",
+            "command": "source ~/.claude/env && python ~/.claude/skills/sync-claude-sessions/scripts/claude-sessions sync",
             "timeout": 10
           }
         ]
@@ -49,7 +50,7 @@ Edit `~/.claude/settings.json` and add the hooks:
         "hooks": [
           {
             "type": "command",
-            "command": "python ~/.claude/skills/sync-claude-sessions/scripts/claude-sessions sync",
+            "command": "source ~/.claude/env && python ~/.claude/skills/sync-claude-sessions/scripts/claude-sessions sync",
             "timeout": 10
           }
         ]
