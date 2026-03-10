@@ -20,7 +20,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 
 # Patterns to strip from user messages (keep in sync with recall scripts)
 STRIP_PATTERNS = [
@@ -44,6 +44,130 @@ def clean_text(text: str) -> str:
     for pat in STRIP_PATTERNS:
         text = pat.sub('', text)
     return text.strip()
+
+
+# English stop words for TF-IDF keyword extraction
+_STOP_WORDS = {
+    "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
+    "have", "has", "had", "do", "does", "did", "will", "would", "could",
+    "should", "may", "might", "can", "shall", "to", "of", "in", "for",
+    "on", "with", "at", "by", "from", "as", "into", "through", "during",
+    "before", "after", "above", "below", "between", "and", "but", "or",
+    "not", "no", "so", "if", "then", "than", "too", "very", "just",
+    "about", "up", "out", "this", "that", "it", "its", "my", "your",
+    "we", "they", "them", "he", "she", "me", "i", "you", "all", "each",
+    "which", "what", "when", "where", "how", "who", "whom", "there",
+    "here", "also", "more", "some", "any", "only", "other", "new",
+    "one", "two", "like", "use", "used", "using", "make", "get",
+    # Technical noise
+    "file", "code", "error", "true", "false", "null", "none",
+    "run", "test", "check", "see", "look", "want", "need",
+}
+
+
+def _tokenize(text: str) -> list[str]:
+    """Tokenize text into English words only (Korean lacks morphological analysis)."""
+    return [w for w in re.findall(r'[a-zA-Z]{2,}', text.lower())
+            if w not in _STOP_WORDS]
+
+
+def _build_corpus_df() -> dict[str, int]:
+    """Build document frequency from existing session files in OUTPUT_DIR.
+    Returns dict mapping word -> number of documents containing it."""
+    df: dict[str, int] = {}
+    if not OUTPUT_DIR.exists():
+        return df
+    for f in OUTPUT_DIR.glob("*.md"):
+        try:
+            content = f.read_text(encoding="utf-8")
+            # Extract conversation section only (skip frontmatter/artifacts)
+            conv_start = content.find("## Conversation")
+            if conv_start >= 0:
+                content = content[conv_start:]
+            words_in_doc = set(_tokenize(content))
+            for w in words_in_doc:
+                df[w] = df.get(w, 0) + 1
+        except Exception:
+            continue
+    return df
+
+
+def extract_keywords(user_messages: list[str], max_keywords: int = 3) -> list[str]:
+    """Extract top keywords using TF-IDF against existing sessions as corpus."""
+    import math
+
+    # Term frequency for this session
+    tf: dict[str, int] = {}
+    for msg in user_messages:
+        for word in _tokenize(msg):
+            tf[word] = tf.get(word, 0) + 1
+    if not tf:
+        return []
+
+    # Document frequency from corpus
+    df = _build_corpus_df()
+    n_docs = max(len(list(OUTPUT_DIR.glob("*.md"))) if OUTPUT_DIR.exists() else 0, 1)
+
+    # TF-IDF scoring
+    scores: dict[str, float] = {}
+    for word, count in tf.items():
+        # log-normalized TF * IDF
+        word_tf = 1 + math.log(count)
+        word_idf = math.log(1 + n_docs / (1 + df.get(word, 0)))
+        scores[word] = word_tf * word_idf
+
+    sorted_words = sorted(scores.items(), key=lambda x: -x[1])
+    return [w for w, _ in sorted_words[:max_keywords]]
+
+
+def extract_project_name(records: list[dict]) -> str | None:
+    """Extract project/repo name from CWD in JSONL records."""
+    for record in records:
+        cwd = record.get("cwd")
+        if cwd:
+            # Use last path component as project name
+            return Path(cwd).name
+    return None
+
+
+def detect_continuation(records: list[dict]) -> bool:
+    """Check if this session is a continuation of a previous one."""
+    for record in records:
+        if record.get("type") != "user":
+            continue
+        msg = record.get("message", {})
+        content = msg.get("content", "")
+        if isinstance(content, str) and "continued from a previous conversation" in content.lower():
+            return True
+        if isinstance(content, list):
+            for item in content:
+                if isinstance(item, dict) and item.get("type") == "text":
+                    if "continued from a previous conversation" in item.get("text", "").lower():
+                        return True
+    return False
+
+
+def find_previous_session(session_date: str, session_id: str, project_name: str | None) -> str | None:
+    """Find the previous session file in the same project for linking."""
+    if not OUTPUT_DIR.exists():
+        return None
+    candidates = []
+    for f in OUTPUT_DIR.glob("*.md"):
+        if f.stem.endswith(session_id[:8]):
+            continue  # skip self
+        fm = parse_frontmatter(f.read_text(encoding="utf-8"))
+        fm_date = fm.get("date", "")
+        fm_projects = fm.get("projects", [])
+        # Match by project if available, otherwise by date proximity
+        if project_name and isinstance(fm_projects, list) and project_name in fm_projects:
+            candidates.append((fm_date, f.stem))
+        elif not project_name and fm_date <= session_date:
+            candidates.append((fm_date, f.stem))
+    if not candidates:
+        return None
+    # Most recent before or on same date
+    candidates.sort(key=lambda x: x[0], reverse=True)
+    return candidates[0][1]
 
 
 # Configuration - auto-detect from environment or CWD
@@ -219,7 +343,7 @@ def extract_session_data(records: list[dict]) -> dict:
             # Skip skill instructions and short messages
             if candidate.startswith("Base directory for this skill:"):
                 continue
-            if len(candidate) < 5:
+            if len(candidate) < 3:
                 continue
             data["title"] = candidate[:80]
             break
@@ -232,6 +356,15 @@ def extract_session_data(records: list[dict]) -> dict:
     file_ops = extract_file_operations(records)
     data["files_created"] = file_ops["created"]
     data["files_modified"] = file_ops["modified"]
+
+    # Extract project name from CWD
+    data["project_name"] = extract_project_name(records)
+
+    # Extract keywords from user messages
+    data["keywords"] = extract_keywords(data["user_messages"])
+
+    # Detect if continuation session
+    data["is_continuation"] = detect_continuation(records)
 
     return data
 
@@ -321,10 +454,12 @@ def generate_markdown(data: dict, session_id: str, existing_fm: dict | None = No
     lines.append(f"date: {data['date']}")
     lines.append(f"session_id: {session_id}")
 
-    # Use preserved title if exists, otherwise from transcript
+    # Use preserved title if exists, otherwise from transcript — clean old tag residue
     title = existing_fm.get("title") if existing_fm else None
-    if not title or title == "Untitled Session":
-        title = data["title"] or "Untitled Session"
+    if title:
+        title = clean_text(title)
+    if not title or title in ("Untitled", "Untitled Session"):
+        title = data["title"] or "Untitled"
     title_escaped = title.replace('"', '\\"')
     lines.append(f'title: "{title_escaped}"')
 
@@ -346,11 +481,23 @@ def generate_markdown(data: dict, session_id: str, existing_fm: dict | None = No
     status = existing_fm.get("status", "active") if existing_fm else "active"
     lines.append(f"status: {status}")
 
-    # Tags
-    tags = existing_fm.get("tags", []) if existing_fm else []
-    if isinstance(tags, list) and tags:
+    # Tags — auto tags are regenerated each sync, manual tags preserved
+    # Auto tags: "claude-session" + keywords (recalculated every sync)
+    auto_tags = ["claude-session"]
+    keywords = data.get("keywords", [])
+    auto_tags.extend(keywords)
+    # Manual tags: existing tags that aren't in old auto set (user-added)
+    existing_tags = existing_fm.get("tags", []) if existing_fm else []
+    if not isinstance(existing_tags, list):
+        existing_tags = []
+    # Convention: user-added manual tags use "/" prefix (e.g. "project/foo", "topic/auth")
+    # All other tags are auto-generated and get replaced each sync
+    manual_tags = [t for t in existing_tags if "/" in t]
+    # Final: auto first, then manual
+    merged_tags = list(auto_tags) + manual_tags
+    if merged_tags:
         lines.append("tags:")
-        for tag in tags:
+        for tag in merged_tags:
             lines.append(f"  - {tag}")
     else:
         lines.append("tags: []")
@@ -371,9 +518,14 @@ def generate_markdown(data: dict, session_id: str, existing_fm: dict | None = No
     else:
         lines.append('comments: ""')
 
-    # Projects
+    # Projects — auto-fill from CWD if empty
     projects = existing_fm.get("projects", []) if existing_fm else []
-    if isinstance(projects, list) and projects:
+    if not isinstance(projects, list):
+        projects = []
+    project_name = data.get("project_name")
+    if project_name and project_name not in projects:
+        projects.append(project_name)
+    if projects:
         lines.append("projects:")
         for proj in projects:
             lines.append(f"  - {proj}")
@@ -386,6 +538,19 @@ def generate_markdown(data: dict, session_id: str, existing_fm: dict | None = No
     # Content
     lines.append(f"# {title}")
     lines.append("")
+
+    # Wikilinks for Obsidian graph connectivity
+    link_parts = []
+    project_name = data.get("project_name")
+    if project_name:
+        link_parts.append(f"Project: [[{project_name}]]")
+    if data.get("is_continuation"):
+        prev = find_previous_session(data["date"], session_id, project_name)
+        if prev:
+            link_parts.append(f"Prev: [[{prev}]]")
+    if link_parts:
+        lines.append("> " + " | ".join(link_parts))
+        lines.append("")
 
     if data["summary"]:
         lines.append("## Summary")
@@ -414,14 +579,12 @@ def generate_markdown(data: dict, session_id: str, existing_fm: dict | None = No
         if files_created:
             lines.append("**Created:**")
             for file_path in files_created:
-                wikilink = path_to_wikilink(file_path)
-                lines.append(f"- {wikilink}" if wikilink else f"- `{file_path}`")
+                lines.append(f"- `{file_path}`")
             lines.append("")
         if files_modified:
             lines.append("**Modified:**")
             for file_path in sorted(files_modified):
-                wikilink = path_to_wikilink(file_path)
-                lines.append(f"- {wikilink}" if wikilink else f"- `{file_path}`")
+                lines.append(f"- `{file_path}`")
             lines.append("")
 
     # My Notes
@@ -450,15 +613,17 @@ def generate_markdown(data: dict, session_id: str, existing_fm: dict | None = No
 # =============================================================================
 
 def find_session_file(session_id: str) -> Path | None:
-    """Find existing markdown file for a session."""
+    """Find existing markdown file for a session by ID suffix."""
     short_id = session_id[:8]
+    if not OUTPUT_DIR.exists():
+        return None
     for f in OUTPUT_DIR.glob(f"*-{short_id}.md"):
         return f
     return None
 
 
 def get_output_path(session_id: str, date: str) -> Path:
-    """Get output file path for a session."""
+    """Get output file path: date-shortid.md"""
     return OUTPUT_DIR / f"{date}-{session_id[:8]}.md"
 
 
@@ -483,14 +648,15 @@ def sync_session(session_id: str, transcript_path: str | None = None, quiet: boo
     data["session_id"] = session_id
 
     existing_file = find_session_file(session_id)
-    output_file = existing_file or get_output_path(session_id, data["date"])
 
     existing_fm = None
     my_notes = None
-    if output_file.exists():
-        content = output_file.read_text(encoding="utf-8")
+    if existing_file and existing_file.exists():
+        content = existing_file.read_text(encoding="utf-8")
         existing_fm = parse_frontmatter(content)
         my_notes = extract_my_notes_section(content)
+
+    output_file = existing_file or get_output_path(session_id, data["date"])
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     markdown = generate_markdown(data, session_id, existing_fm, my_notes)
