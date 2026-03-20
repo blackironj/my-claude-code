@@ -24,7 +24,7 @@ from zoneinfo import ZoneInfo
 
 LOCAL_TZ = ZoneInfo(os.environ.get("CLAUDE_SESSIONS_TZ", "Asia/Seoul"))
 
-__version__ = "1.3.0"
+__version__ = "1.4.0"
 
 # Import shared text cleaning utilities (single source of truth)
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
@@ -77,14 +77,14 @@ def _build_corpus_df() -> dict[str, int]:
     return df
 
 
-def extract_keywords(user_messages: list[str], max_keywords: int = 3) -> list[str]:
-    """Extract top keywords using TF-IDF against existing sessions as corpus."""
+def extract_keywords(conversation: list[dict], max_keywords: int = 3) -> list[str]:
+    """Extract top keywords using TF-IDF from conversation turns (user + assistant)."""
     import math
 
-    # Term frequency for this session
+    # Term frequency for this session — include both user and assistant text
     tf: dict[str, int] = {}
-    for msg in user_messages:
-        for word in _tokenize(msg):
+    for turn in conversation:
+        for word in _tokenize(turn["text"]):
             tf[word] = tf.get(word, 0) + 1
     if not tf:
         return []
@@ -188,6 +188,7 @@ SESSIONS_DIR = _detect_sessions_dir()
 
 PRESERVED_FIELDS = {"comments", "projects", "status", "tags", "rating", "title", "title_source"}
 PRESERVED_SECTION = "## My Notes"
+ASSISTANT_TRUNCATE = 500  # Max chars per assistant turn in markdown
 
 
 # =============================================================================
@@ -260,7 +261,8 @@ def extract_session_data(records: list[dict]) -> dict:
         "summary": None,
         "skills": [],
         "messages": 0,
-        "user_messages": [],
+        "conversation": [],      # ordered (role, text) turns
+        "user_messages": [],     # derived later for keywords/title
         "first_timestamp": None,
         "last_timestamp": None,
         "files_created": [],
@@ -297,30 +299,59 @@ def extract_session_data(records: list[dict]) -> dict:
             data["messages"] += 1
             msg = record.get("message", {})
             content = msg.get("content", "")
+            text_parts = []
             if content and isinstance(content, str):
                 if not record.get("isMeta"):
-                    data["user_messages"].append(content)
+                    text_parts.append(content)
             elif isinstance(content, list):
                 for item in content:
                     if isinstance(item, dict) and item.get("type") == "text":
                         text = item.get("text", "")
                         if text and not record.get("isMeta"):
-                            data["user_messages"].append(text)
+                            text_parts.append(text)
+            if text_parts:
+                combined = "\n".join(text_parts)
+                data["conversation"].append({"role": "user", "text": combined})
 
         if record_type == "assistant":
             msg = record.get("message", {})
             contents = msg.get("content", [])
+            text_parts = []
             if isinstance(contents, list):
                 for item in contents:
-                    if isinstance(item, dict) and item.get("name") == "Skill":
-                        skill_input = item.get("input", {})
-                        skill_name = skill_input.get("skill", "")
-                        if skill_name and skill_name not in data["skills"]:
-                            data["skills"].append(skill_name)
+                    if isinstance(item, dict):
+                        if item.get("type") == "text":
+                            text = item.get("text", "").strip()
+                            if text:
+                                text_parts.append(text)
+                        elif item.get("name") == "Skill":
+                            skill_input = item.get("input", {})
+                            skill_name = skill_input.get("skill", "")
+                            if skill_name and skill_name not in data["skills"]:
+                                data["skills"].append(skill_name)
+            if text_parts:
+                combined = "\n".join(text_parts)
+                # Merge consecutive assistant turns (tool chains)
+                if data["conversation"] and data["conversation"][-1]["role"] == "assistant":
+                    prev = data["conversation"][-1]["text"]
+                    data["conversation"][-1]["text"] = prev + "\n\n" + combined
+                else:
+                    data["conversation"].append({"role": "assistant", "text": combined})
 
-    # Clean user messages of system tags
-    data["user_messages"] = [clean_text(m) for m in data["user_messages"]]
+    # Derive user_messages from conversation for keywords/title
+    data["user_messages"] = [
+        clean_text(turn["text"])
+        for turn in data["conversation"] if turn["role"] == "user"
+    ]
     data["user_messages"] = [m for m in data["user_messages"] if m]
+
+    # Clean user turns only (assistant text may contain legitimate angle-bracket content)
+    for turn in data["conversation"]:
+        if turn["role"] == "user":
+            turn["text"] = clean_text(turn["text"])
+        else:
+            turn["text"] = turn["text"].strip()
+    data["conversation"] = [t for t in data["conversation"] if t["text"]]
 
     if data["user_messages"]:
         # Always derive title from first meaningful user message (after cleaning)
@@ -347,7 +378,7 @@ def extract_session_data(records: list[dict]) -> dict:
     data["project_name"] = extract_project_name(records)
 
     # Extract keywords from user messages
-    data["keywords"] = extract_keywords(data["user_messages"])
+    data["keywords"] = extract_keywords(data["conversation"])
 
     # Detect if continuation session
     data["is_continuation"] = detect_continuation(records)
@@ -599,11 +630,20 @@ def generate_markdown(data: dict, session_id: str, existing_fm: dict | None = No
     # Conversation
     lines.append("## Conversation")
     lines.append("")
-    for msg in data["user_messages"]:
-        lines.append("### User")
-        lines.append("")
-        lines.append(msg)
-        lines.append("")
+    for turn in data.get("conversation", []):
+        if turn["role"] == "user":
+            lines.append("### User")
+            lines.append("")
+            lines.append(turn["text"])
+            lines.append("")
+        elif turn["role"] == "assistant":
+            lines.append("### Assistant")
+            lines.append("")
+            text = turn["text"]
+            if len(text) > ASSISTANT_TRUNCATE:
+                text = text[:ASSISTANT_TRUNCATE].rstrip() + "..."
+            lines.append(text)
+            lines.append("")
 
     return "\n".join(lines)
 
