@@ -1,18 +1,18 @@
 ---
 name: recall
-description: Load context from vault memory. Temporal queries (yesterday, last week, session history) use native JSONL timeline. Topic queries use QMD BM25 search. "recall graph" generates interactive temporal graph of sessions and files. Every recall ends with "One Thing" - the single highest-leverage next action synthesized from results. Use when user says "recall", "what did we work on", "load context about", "remember when we", "prime context", "yesterday", "what was I doing", "last week", "session history", "recall graph", "session graph".
+description: Load context from vault memory. Temporal queries (yesterday, last week, session history) use native JSONL timeline. Topic queries use ir BM25 search (with Korean tokenizer for CJK support). "recall graph" generates interactive temporal graph of sessions and files. Every recall ends with "One Thing" - the single highest-leverage next action synthesized from results. Use when user says "recall", "what did we work on", "load context about", "remember when we", "prime context", "yesterday", "what was I doing", "last week", "session history", "recall graph", "session graph".
 argument-hint: [yesterday|today|last week|this week|TOPIC|graph DATE_EXPR]
-allowed-tools: Bash(qmd:*), Bash(python3:*)
+allowed-tools: Bash(ir:*), Bash(python3:*)
 ---
 
 # Recall Skill
 
-Three modes: temporal (date-based session timeline), topic (BM25 search across QMD collections), and graph (interactive visualization of session-file relationships). Every recall ends with the **One Thing** - a concrete, highest-leverage next action synthesized from the results.
+Three modes: temporal (date-based session timeline), topic (BM25 search across ir collections), and graph (interactive visualization of session-file relationships). Every recall ends with the **One Thing** - a concrete, highest-leverage next action synthesized from the results.
 
 ## What It Does
 
 - **Temporal queries** ("yesterday", "last week", "what was I doing"): Scans native Claude Code JSONL files by date. Shows a table of sessions with time, message count, and first message. Expand any session for conversation details.
-- **Topic queries** ("QMD video", "authentication"): BM25 search across sessions, notes, and daily logs in QMD collections.
+- **Topic queries** ("authentication", "video work"): BM25 search across sessions and notes in ir collections.
 - **Graph queries** ("graph yesterday", "graph last week"): Generates an interactive HTML graph showing sessions as nodes connected to files they touched. Sessions colored by day, files colored by folder. Clusters reveal related work streams, shared files show cross-session dependencies.
 - **One Thing synthesis**: After presenting results, synthesizes the single most impactful next action based on what has momentum, what's blocked, and what's closest to done. Not generic - specific and actionable.
 
@@ -20,7 +20,7 @@ No custom setup needed for temporal recall - every Claude Code user has JSONL fi
 
 ## Auto-Indexing (Optional)
 
-You can auto-index sessions into QMD on every session end via a Claude Code hook. See AGENTS.md for setup instructions.
+You can auto-index sessions into ir on every session end via a Claude Code hook. See AGENTS.md for setup instructions.
 
 ## Usage
 
@@ -28,7 +28,7 @@ You can auto-index sessions into QMD on every session end via a Claude Code hook
 /recall yesterday
 /recall last week
 /recall 2026-02-25
-/recall QMD video
+/recall video work
 /recall authentication work
 ```
 
@@ -50,12 +50,12 @@ python3 ~/.claude/skills/recall/scripts/recall-day.py list DATE_EXPR
 python3 ~/.claude/skills/recall/scripts/recall-day.py expand SESSION_ID
 ```
 
-**Topic** (keyword queries → qmd search with query expansion):
+**Topic** (keyword queries → ir search with query expansion):
 ```bash
-qmd search "VARIANT_1" -c sessions -n 5
-qmd search "VARIANT_2" -c sessions -n 5
-qmd search "VARIANT_1" -c notes -n 5
-qmd get "qmd://collection/path/to/file.md" -l 50
+ir search "VARIANT_1" -c sessions -n 5 --mode bm25 --md
+ir search "VARIANT_2" -c sessions -n 5 --mode bm25 --md
+ir search "VARIANT_1" -c notes -n 5 --mode bm25 --md
+# Document fetch: use Read tool on file paths from search results
 ```
 
 **Graph** (strip "graph" prefix, pass rest as DATE_EXPR):
