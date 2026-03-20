@@ -18,6 +18,33 @@ Three modes: temporal (date-based session timeline), topic (BM25 search across i
 
 No custom setup needed for temporal recall - every Claude Code user has JSONL files.
 
+## Setup (for topic search)
+
+Topic search requires [ir](https://github.com/vlwkaos/ir). If `ir` is not installed, topic queries will not work (temporal and graph still work).
+
+```bash
+# 1. Build ir from source (Rust 1.80+, libclang-dev, cmake)
+cd ~/workspace
+git clone https://github.com/vlwkaos/ir.git && cd ir
+cargo install --path . --no-default-features --features llama-openmp  # Linux
+# cargo install --path .  # macOS (Metal auto-detected)
+
+# 2. Korean preprocessor (optional, for CJK search)
+cd preprocessors/ko/lindera-tokenize  # Linux: build from source
+cargo install --path .
+ir preprocessor add ko lindera-tokenize
+# macOS: ir preprocessor install ko
+
+# 3. Register collections (set VAULT_DIR to your Obsidian vault path)
+ir collection add sessions "$VAULT_DIR/Claude-Sessions/"
+ir collection add notes "$VAULT_DIR/Notes/"
+ir preprocessor bind ko sessions  # skip if no ko preprocessor
+ir preprocessor bind ko notes
+ir update
+```
+
+ir is installed per machine. The Obsidian vault syncs across PCs; ir index is local.
+
 ## Auto-Indexing (Optional)
 
 You can auto-index sessions into ir on every session end via a Claude Code hook. See AGENTS.md for setup instructions.
