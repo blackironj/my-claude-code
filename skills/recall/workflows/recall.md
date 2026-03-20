@@ -15,61 +15,32 @@ Parse the user's input after `/recall` and classify:
 - **Both** - temporal + topic: "what did I do with QMD yesterday"
   -> Go to Step 2A first, then scan results for the topic
 
-## Step 2A: Temporal Recall (Obsidian First, then Local JSONL)
+## Step 2A: Temporal Recall
 
-Obsidian sessions include work from ALL computers (synced), so check there first. Local JSONL catches any unsynced sessions.
+The script automatically scans both local JSONL and Obsidian (if `VAULT_DIR` is set). Local sessions come first; Obsidian adds remote sessions from other computers. Deduplication by session ID is built-in.
 
-### Step 2A.1: Scan Obsidian Sessions by Date (Primary)
+**IMPORTANT: Always prefix with `. ~/.claude/env &&` to inject `VAULT_DIR`.**
 
-Convert DATE_EXPR to date pattern(s) (YYYY-MM-DD), then list matching session files:
-
-```bash
-. ~/.claude/env && ls "$VAULT_DIR/Claude-Sessions/"DATE_PATTERN-* 2>/dev/null
-```
-
-Examples:
-- `yesterday` (2026-03-16) → `ls "$VAULT_DIR/Claude-Sessions/"2026-03-16-*`
-- `this week` → `ls "$VAULT_DIR/Claude-Sessions/"2026-03-{10,11,12,13,14,15,16,17}-*` (expand to each date in range)
-- `last week` → similar expansion for the prior week's dates
-- `2026-03-15` → `ls "$VAULT_DIR/Claude-Sessions/"2026-03-15-*`
-
-For each matched file, read the YAML frontmatter to extract: date, title, messages count, skills, tags, status, projects.
-
-Present as a table:
-| # | Time | Session ID | Title | Msgs | Skills/Tags |
-|---|------|-----------|-------|------|-------------|
-
-### Step 2A.2: Scan Local JSONL (Supplementary)
-
-Also run the local script to catch unsynced sessions:
+### Step 2A.1: List Sessions
 
 ```bash
-python3 ~/.claude/skills/recall/scripts/recall-day.py list DATE_EXPR
+. ~/.claude/env && python3 ~/.claude/skills/recall/scripts/recall-day.py list DATE_EXPR
 ```
 
-Replace `DATE_EXPR` with the parsed date expression. Supported:
-- `yesterday`, `today`
-- `YYYY-MM-DD`
-- `last monday` .. `last sunday`
-- `this week`, `last week`
-- `N days ago`, `last N days`
+Supported DATE_EXPR: `yesterday`, `today`, `YYYY-MM-DD`, `last monday`..`last sunday`, `this week`, `last week`, `N days ago`, `last N days`
 
 Options:
 - `--min-msgs N` - filter noise (default: 3)
 - `--project PATH` - limit to a specific project (default: scans all projects)
 
-### Step 2A.3: Merge & Deduplicate
-
-Match sessions by the 8-char session ID prefix. If a session appears in both Obsidian and local JSONL, prefer the Obsidian version (richer metadata). Show any local-only sessions separately marked as "(unsynced)".
-
-### Step 2A.4: Expand a Session
+### Step 2A.2: Expand a Session
 
 If the user picks a session to expand, offer two depth levels:
 
 **Quick expand** — conversation timeline (user messages, assistant first lines, tool calls):
 
 ```bash
-python3 ~/.claude/skills/recall/scripts/recall-day.py expand SESSION_ID
+. ~/.claude/env && python3 ~/.claude/skills/recall/scripts/recall-day.py expand SESSION_ID
 ```
 
 Options:
@@ -78,6 +49,8 @@ Options:
 - `--all-projects` - scan all projects
 
 **IMPORTANT: These are the ONLY supported flags. Do NOT invent flags like `--summary`. Do NOT suppress stderr with `2>/dev/null`.**
+
+For remote sessions (no local JSONL), expand automatically falls back to Obsidian markdown content.
 
 **Deep context** — read the full synced session markdown from Obsidian vault:
 
@@ -166,7 +139,7 @@ No results found for "QUERY". Try:
 Strip "graph" prefix from query to get the date expression. Run:
 
 ```bash
-python3 ~/.claude/skills/recall/scripts/session-graph.py DATE_EXPR
+. ~/.claude/env && python3 ~/.claude/skills/recall/scripts/session-graph.py DATE_EXPR
 ```
 
 Options:
@@ -182,6 +155,8 @@ Tell the user the node/edge counts and what to look for (clusters, shared files)
 ## CLI Reference (Exact Supported Flags)
 
 **Do NOT invent or guess flags. Only use flags listed below.**
+
+**All commands MUST be prefixed with `. ~/.claude/env &&`**
 
 ### `recall-day.py list DATE_EXPR`
 | Flag | Type | Default | Description |
@@ -208,7 +183,8 @@ Tell the user the node/edge counts and what to look for (clusters, shared files)
 
 ## Notes
 
-- Temporal queries check Obsidian Claude-Sessions first (includes all synced computers), then local JSONL for unsynced sessions
+- **Always prefix commands with `. ~/.claude/env &&`** — this injects `VAULT_DIR` for Obsidian access
+- `recall-day.py` scans local JSONL first, then Obsidian for remote sessions (auto-dedup by session ID)
 - Graph queries go through `session-graph.py` (NetworkX + pyvis)
 - Topic queries use BM25 (`qmd search`) NOT hybrid (`qmd query`) - 53x faster
 - Run all 3 collection searches in parallel to keep response time fast

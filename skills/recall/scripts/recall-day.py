@@ -25,6 +25,86 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from common import STRIP_PATTERNS, clean_content, extract_text, local_tz as _local_tz
 
 CLAUDE_PROJECTS = Path.home() / ".claude" / "projects"
+VAULT_DIR = os.environ.get('VAULT_DIR', '')
+OBSIDIAN_SESSIONS = Path(VAULT_DIR) / "Claude-Sessions" if VAULT_DIR else None
+
+
+def parse_frontmatter(filepath: Path) -> dict | None:
+    """Parse YAML frontmatter from a markdown file without PyYAML dependency."""
+    try:
+        with open(filepath, encoding='utf-8') as f:
+            first_line = f.readline().strip()
+            if first_line != '---':
+                return None
+            lines = []
+            for line in f:
+                if line.strip() == '---':
+                    break
+                lines.append(line)
+            else:
+                return None  # No closing ---
+
+        result = {}
+        for line in lines:
+            m = re.match(r'^(\w[\w_-]*)\s*:\s*(.+)$', line)
+            if m:
+                key = m.group(1)
+                val = m.group(2).strip().strip('"').strip("'")
+                if val == 'null':
+                    val = None
+                elif val.isdigit():
+                    val = int(val)
+                result[key] = val
+        return result
+    except (OSError, UnicodeDecodeError):
+        return None
+
+
+def scan_obsidian_sessions(date_start: datetime, date_end: datetime) -> list[dict]:
+    """Scan Obsidian Claude-Sessions for the given date range. Returns session metadata list."""
+    if not OBSIDIAN_SESSIONS or not OBSIDIAN_SESSIONS.exists():
+        return []
+
+    sessions = []
+    # Generate date patterns for the range
+    current = date_start.date() if hasattr(date_start, 'date') else date_start
+    end = date_end.date() if hasattr(date_end, 'date') else date_end
+
+    while current < end:
+        date_str = current.strftime('%Y-%m-%d')
+        for md_file in OBSIDIAN_SESSIONS.glob(f"{date_str}-*.md"):
+            fm = parse_frontmatter(md_file)
+            if not fm:
+                continue
+
+            session_id = fm.get('session_id', md_file.stem.split('-', 3)[-1] if '-' in md_file.stem else md_file.stem)
+            title = fm.get('title', 'Untitled')
+            messages = fm.get('messages', 0)
+            last_activity = fm.get('last_activity', '')
+
+            # Parse time from last_activity or filename date
+            start_time = None
+            if last_activity:
+                try:
+                    start_time = datetime.fromisoformat(last_activity.replace('Z', '+00:00')).astimezone(_local_tz())
+                except (ValueError, TypeError):
+                    pass
+            if not start_time:
+                start_time = datetime(current.year, current.month, current.day, tzinfo=_local_tz())
+
+            sessions.append({
+                'session_id': session_id,
+                'start_time': start_time,
+                'user_msg_count': messages if isinstance(messages, int) else 0,
+                'file_size': md_file.stat().st_size,
+                'title': title[:80] if title else 'Untitled',
+                'filepath': str(md_file),
+                'source': 'remote',
+            })
+
+        current += timedelta(days=1)
+
+    return sessions
 
 DAY_NAMES = {
     'monday': 0, 'tuesday': 1, 'wednesday': 2, 'thursday': 3,
@@ -214,6 +294,7 @@ def cmd_list(args):
     noise_count = 0
     total_scanned = 0
 
+    # 1. Local JSONL scan (primary, fast)
     for proj_dir in project_dirs:
         jsonl_files = list(proj_dir.glob("*.jsonl"))
         total_scanned += len(jsonl_files)
@@ -231,11 +312,24 @@ def cmd_list(args):
             if meta is None:
                 continue
 
+            meta['source'] = 'local'
+
             if meta['user_msg_count'] < args.min_msgs:
                 noise_count += 1
                 continue
 
             sessions.append(meta)
+
+    # 2. Obsidian scan (supplementary — catches sessions from other computers)
+    local_ids = {s['session_id'][:8] for s in sessions}
+    obsidian_sessions = scan_obsidian_sessions(date_start, date_end)
+    remote_count = 0
+    for obs in obsidian_sessions:
+        obs_id_short = obs['session_id'][:8]
+        if obs_id_short not in local_ids:
+            if obs['user_msg_count'] >= args.min_msgs:
+                sessions.append(obs)
+                remote_count += 1
 
     sessions.sort(key=lambda s: s['start_time'])
 
@@ -254,17 +348,27 @@ def cmd_list(args):
         return
 
     # Print table
-    print(f" {'#':>2}  {'Time':5}  {'Msgs':>4}  {'Size':>6}  First Message")
-    print(f" {'--':>2}  {'-----':5}  {'----':>4}  {'------':>6}  -------------")
+    has_remote = any(s.get('source') == 'remote' for s in sessions)
+    if has_remote:
+        print(f" {'#':>2}  {'Time':5}  {'Msgs':>4}  {'Size':>6}  {'Src':6}  First Message")
+        print(f" {'--':>2}  {'-----':5}  {'----':>4}  {'------':>6}  {'------':6}  -------------")
+    else:
+        print(f" {'#':>2}  {'Time':5}  {'Msgs':>4}  {'Size':>6}  First Message")
+        print(f" {'--':>2}  {'-----':5}  {'----':>4}  {'------':>6}  -------------")
 
     for i, s in enumerate(sessions, 1):
         time_str = s['start_time'].strftime('%H:%M')
         size_str = format_size(s['file_size'])
         title = s['title'][:60]
-        sid_short = s['session_id'][:8]
-        print(f" {i:2}  {time_str}  {s['user_msg_count']:4}  {size_str:>6}  {title}")
+        if has_remote:
+            src = 'remote' if s.get('source') == 'remote' else 'local'
+            print(f" {i:2}  {time_str}  {s['user_msg_count']:4}  {size_str:>6}  {src:6}  {title}")
+        else:
+            print(f" {i:2}  {time_str}  {s['user_msg_count']:4}  {size_str:>6}  {title}")
 
     print(f"\n{len(sessions)} sessions", end="")
+    if remote_count:
+        print(f" ({remote_count} remote)", end="")
     if noise_count:
         print(f" ({noise_count} filtered as noise)", end="")
     print()
@@ -273,6 +377,19 @@ def cmd_list(args):
     print(f"\nSession IDs (for expand):")
     for i, s in enumerate(sessions, 1):
         print(f"  {i:2}. {s['session_id'][:8]}")
+
+
+def find_obsidian_session(session_id_prefix: str) -> Path | None:
+    """Find an Obsidian session markdown file by session ID prefix."""
+    if not OBSIDIAN_SESSIONS or not OBSIDIAN_SESSIONS.exists():
+        return None
+    for md_file in OBSIDIAN_SESSIONS.glob(f"*-{session_id_prefix}*.md"):
+        return md_file
+    # Also try broader match
+    for md_file in OBSIDIAN_SESSIONS.glob("*.md"):
+        if session_id_prefix in md_file.stem:
+            return md_file
+    return None
 
 
 def cmd_expand(args):
@@ -290,7 +407,26 @@ def cmd_expand(args):
         if target_file:
             break
 
+    # Fallback to Obsidian if no local JSONL
     if not target_file:
+        obs_file = find_obsidian_session(target_id)
+        if obs_file:
+            print(f"\nSession: {obs_file.stem} (remote — from Obsidian)")
+            print(f"File: {obs_file}")
+            print()
+            # Print markdown content (skip frontmatter)
+            in_frontmatter = False
+            with open(obs_file, encoding='utf-8') as f:
+                for line in f:
+                    if line.strip() == '---' and not in_frontmatter:
+                        in_frontmatter = True
+                        continue
+                    if line.strip() == '---' and in_frontmatter:
+                        in_frontmatter = False
+                        continue
+                    if not in_frontmatter:
+                        print(line, end='')
+            return
         print(f"Error: No session found matching '{args.session_id}'", file=sys.stderr)
         sys.exit(1)
 
