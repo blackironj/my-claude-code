@@ -102,16 +102,43 @@ This is the only file that differs per PC. All hooks source it automatically.
 
 ```bash
 # Build from source (Rust 1.80+ required)
-cd ~/workspace/ir
+cd ~/workspace
+git clone https://github.com/vlwkaos/ir.git
+cd ir
 cargo install --path .
+
+# Korean preprocessor (build from source on Linux)
+cd preprocessors/ko/lindera-tokenize
+cargo install --path .
+ir preprocessor add ko lindera-tokenize
 
 # Register collections and build index
 ir collection add sessions "$VAULT_DIR/Claude-Sessions/"
 ir collection add notes "$VAULT_DIR/Notes/"
+ir preprocessor bind ko sessions
+ir preprocessor bind ko notes
 ir update
 ```
 
-See [setup guide](skills/sync-claude-sessions/workflows/setup.md) for full details.
+Build deps: `libclang-dev`, `cmake`. See [setup guide](skills/sync-claude-sessions/workflows/setup.md) for full details.
+
+## Updating
+
+After editing skills in this repo, copy changed files to `~/.claude/skills/`:
+
+```bash
+cd claude-code-skills
+
+# Update all skills + hooks
+cp -r skills/recall ~/.claude/skills/
+cp -r skills/sync-claude-sessions ~/.claude/skills/
+cp hooks/index-sessions.sh ~/.claude/hooks/
+```
+
+Or update a single file:
+```bash
+cp skills/recall/workflows/recall.md ~/.claude/skills/recall/workflows/
+```
 
 ## Requirements
 
