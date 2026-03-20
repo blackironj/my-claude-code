@@ -1,0 +1,12 @@
+{
+  "name": "claude-code-skills",
+  "version": "1.0.0",
+  "description": "Session sync to Obsidian + recall with Korean BM25 search (ir)",
+  "author": {
+    "name": "blackironj",
+    "url": "https://github.com/blackironj"
+  },
+  "repository": "https://github.com/blackironj/claude-code-skills",
+  "license": "MIT",
+  "keywords": ["obsidian", "recall", "session-sync", "korean"]
+}
