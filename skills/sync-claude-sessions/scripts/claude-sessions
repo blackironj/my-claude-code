@@ -50,10 +50,52 @@ _STOP_WORDS = {
 }
 
 
+def _find_ko_preprocessor() -> str | None:
+    """Find ir's Korean preprocessor binary."""
+    for p in [
+        Path.home() / ".cargo" / "bin" / "lindera-tokenize",
+    ]:
+        if p.exists() and os.access(str(p), os.X_OK):
+            return str(p)
+    return None
+
+
+_KO_PREPROCESSOR = _find_ko_preprocessor()
+
+
+def _tokenize_korean(text: str) -> list[str]:
+    """Extract Korean keywords via ir's ko preprocessor.
+
+    Returns empty list if preprocessor unavailable or text has no Korean.
+    """
+    if not _KO_PREPROCESSOR:
+        return []
+    # Quick check: skip if no Korean characters
+    if not re.search(r'[\uac00-\ud7af]', text):
+        return []
+    try:
+        result = subprocess.run(
+            [_KO_PREPROCESSOR],
+            input=text,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode != 0:
+            return []
+        tokens = result.stdout.strip().split()
+        # Filter: drop 1-char tokens (particles, noise) and English (already handled)
+        return [t for t in tokens if len(t) > 1 and re.search(r'[\uac00-\ud7af]', t)]
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        return []
+
+
 def _tokenize(text: str) -> list[str]:
-    """Tokenize text into English words only (Korean lacks morphological analysis)."""
-    return [w for w in re.findall(r'[a-zA-Z]{2,}', text.lower())
-            if w not in _STOP_WORDS]
+    """Tokenize text into English + Korean keywords."""
+    en_tokens = [w for w in re.findall(r'[a-zA-Z]{2,}', text.lower())
+                 if w not in _STOP_WORDS]
+    ko_tokens = _tokenize_korean(text)
+    return en_tokens + ko_tokens
 
 
 def _build_corpus_df() -> dict[str, int]:
