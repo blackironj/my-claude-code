@@ -75,17 +75,15 @@ BM25 is keyword-based - it only finds exact word matches. The user's recall of a
 - Korean query example: "디스크 정리" → `"디스크 정리 용량"`, `"disk cleanup free space"`, `"대용량 파일 삭제"`
 - English query example: "disk cleanup" → `"disk cleanup free space"`, `"디스크 정리"`, `"large files storage"`, `"delete cache bloat GB"`
 
-**Step 2B.2: Run ALL variants across ALL collections in parallel** (fast, ~0.3s each):
+**Step 2B.2: Run ALL variants in parallel** (fast, ~0.3s each):
 
 ```bash
 ir search "VARIANT_1" -c sessions -n 5 --mode bm25 --md
 ir search "VARIANT_2" -c sessions -n 5 --mode bm25 --md
 ir search "VARIANT_3" -c sessions -n 5 --mode bm25 --md
-ir search "VARIANT_1" -c notes -n 5 --mode bm25 --md
-ir search "VARIANT_2" -c notes -n 5 --mode bm25 --md
 ```
 
-Run sessions variants in parallel. Notes can use fewer variants (prioritize sessions for recall).
+Run all variants in parallel for fast response.
 
 **Step 2B.3: Deduplicate results** by document path. If same doc appears in multiple searches, keep the highest score. Present top 5 unique results.
 
@@ -180,6 +178,6 @@ Tell the user the node/edge counts and what to look for (clusters, shared files)
 - `recall-day.py` scans local JSONL first, then Obsidian for remote sessions (auto-dedup by session ID)
 - Graph queries go through `session-graph.py` (NetworkX + pyvis)
 - Topic queries use BM25 (`ir search --mode bm25`) - fast keyword search with Korean support
-- Run all collection searches (sessions + notes) in parallel to keep response time fast
+- Run all search variants in parallel to keep response time fast
 - If a result is truncated or you need more context, Read the full file from the Obsidian vault
 - **Never suppress stderr with `2>/dev/null`** — let argparse errors surface so you can see what's wrong

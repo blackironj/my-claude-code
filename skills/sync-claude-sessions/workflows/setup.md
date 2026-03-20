@@ -80,7 +80,7 @@ chmod +x ~/.claude/hooks/index-sessions.sh
 
 ### Step 5: ir for topic search (optional)
 
-Install [ir](https://github.com/vlwkaos/ir) for keyword search across sessions and notes. ir is installed locally per machine — the Obsidian vault (with `Claude-Sessions/` and `Notes/`) syncs across PCs via Obsidian Sync, but ir and its index must be set up on each machine.
+Install [ir](https://github.com/vlwkaos/ir) for keyword search across sessions. ir is installed locally per machine — the Obsidian vault (with `Claude-Sessions/`) syncs across PCs via Obsidian Sync, but ir and its index must be set up on each machine.
 
 ```bash
 # Build from source (Rust 1.80+ required)
@@ -92,13 +92,11 @@ cd ~/workspace/ir/preprocessors/ko/lindera-tokenize
 cargo install --path .
 ir preprocessor add ko lindera-tokenize
 
-# Register collections
+# Register collection
 ir collection add sessions "$VAULT_DIR/Claude-Sessions/"
-ir collection add notes "$VAULT_DIR/Notes/"
 
 # Bind preprocessor + build index
 ir preprocessor bind ko sessions
-ir preprocessor bind ko notes
 ir update
 ```
 

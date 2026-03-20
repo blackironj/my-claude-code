@@ -127,11 +127,9 @@ cargo install --path .
 ir preprocessor add ko lindera-tokenize
 # macOS: ir preprocessor install ko
 
-# Register collections and build index
+# Register collection and build index
 ir collection add sessions "$VAULT_DIR/Claude-Sessions/"
-ir collection add notes "$VAULT_DIR/Notes/"
 ir preprocessor bind ko sessions
-ir preprocessor bind ko notes
 ir update
 ```
 
