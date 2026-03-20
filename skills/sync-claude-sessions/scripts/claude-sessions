@@ -1003,14 +1003,14 @@ def cmd_export(args):
         if sync_session(session_id, str(session_file), quiet=args.quiet):
             synced += 1
 
-    # Auto-run qmd update after --all-projects export
+    # Auto-run ir update after --all-projects export
     if args.all_projects and synced > 0:
         try:
-            subprocess.run(["qmd", "update"], timeout=60, capture_output=not args.quiet)
+            subprocess.run(["ir", "update"], timeout=120, capture_output=not args.quiet)
             if not args.quiet:
-                print(f"QMD index updated ({synced} sessions synced)")
+                print(f"ir index updated ({synced} sessions synced)")
         except (FileNotFoundError, subprocess.TimeoutExpired):
-            pass  # qmd not installed or timed out
+            pass  # ir not installed or timed out
 
     return 0
 
