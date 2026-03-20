@@ -1,6 +1,6 @@
-# claude-code-skills
+# my-claude-skills
 
-Two [Claude Code](https://docs.anthropic.com/en/docs/claude-code) skills for session memory and recall. Adapted from [ArtemXTech/personal-os-skills](https://github.com/ArtemXTech/personal-os-skills).
+Claude Code skills for session memory and recall with Obsidian integration. Adapted from [ArtemXTech/personal-os-skills](https://github.com/ArtemXTech/personal-os-skills).
 
 ## Skills
 
@@ -11,6 +11,7 @@ Export Claude Code conversations to Obsidian markdown with live sync via hooks. 
 Features:
 - Real-time session sync to `Claude-Sessions/` in your Obsidian vault
 - Frontmatter with metadata (date, title, skills, messages, status, tags, rating)
+- Korean + English keyword extraction for tags (via ir's Korean preprocessor)
 - `## My Notes` section preserved across syncs
 - Commands: `sync`, `export`, `resume`, `note`, `close`, `list`, `log`
 
@@ -19,21 +20,34 @@ Features:
 Load context from previous sessions. Three modes:
 
 - **Temporal** (date-based): `/recall yesterday`, `/recall last week`
-- **Topic** (BM25 search): `/recall authentication` (requires [ir](https://github.com/vlwkaos/ir))
+- **Topic** (BM25 search): `/recall authentication`, `/recall 인증 작업` (requires [ir](https://github.com/vlwkaos/ir))
 - **Graph** (visualization): `/recall graph last week` (requires networkx, pyvis)
 
 Ends every recall with **One Thing** — the single highest-leverage next action.
 
+### save-doc
+
+Save session content (analysis, specs, designs) to Obsidian vault.
+
 ## Installation
 
+### Option A: Claude Code Plugin (recommended)
+
 ```bash
-# Clone
-git clone https://github.com/blackironj/claude-code-skills.git
-cd claude-code-skills
+claude plugin marketplace add blackironj/my-claude-skills
+claude plugin install my-claude-skills
+```
+
+### Option B: Manual
+
+```bash
+git clone https://github.com/blackironj/my-claude-skills.git
+cd my-claude-skills
 
 # Install skills
 cp -r skills/recall ~/.claude/skills/
 cp -r skills/sync-claude-sessions ~/.claude/skills/
+cp -r skills/save-doc ~/.claude/skills/
 
 # Install SessionEnd hook
 mkdir -p ~/.claude/hooks
@@ -101,16 +115,17 @@ This is the only file that differs per PC. All hooks source it automatically.
 ### 3. (Optional) ir for topic search
 
 ```bash
-# Build from source (Rust 1.80+ required)
+# Build ir from source (Rust 1.80+ required, libclang-dev, cmake)
 cd ~/workspace
-git clone https://github.com/vlwkaos/ir.git
-cd ir
-cargo install --path .
+git clone https://github.com/vlwkaos/ir.git && cd ir
+cargo install --path . --no-default-features --features llama-openmp  # Linux
+# cargo install --path .  # macOS (Metal auto-detected)
 
-# Korean preprocessor (build from source on Linux)
-cd preprocessors/ko/lindera-tokenize
+# Korean preprocessor
+cd preprocessors/ko/lindera-tokenize  # Linux: build from source
 cargo install --path .
 ir preprocessor add ko lindera-tokenize
+# macOS: ir preprocessor install ko
 
 # Register collections and build index
 ir collection add sessions "$VAULT_DIR/Claude-Sessions/"
@@ -120,24 +135,23 @@ ir preprocessor bind ko notes
 ir update
 ```
 
-Build deps: `libclang-dev`, `cmake`. See [setup guide](skills/sync-claude-sessions/workflows/setup.md) for full details.
+ir is installed per machine. The Obsidian vault syncs across PCs; ir index is local.
+
+See [setup guide](skills/sync-claude-sessions/workflows/setup.md) for full details.
 
 ## Updating
 
-After editing skills in this repo, copy changed files to `~/.claude/skills/`:
-
+### Plugin install
 ```bash
-cd claude-code-skills
+claude plugin update my-claude-skills
+```
 
-# Update all skills + hooks
+### Manual install
+```bash
+cd my-claude-skills
 cp -r skills/recall ~/.claude/skills/
 cp -r skills/sync-claude-sessions ~/.claude/skills/
 cp hooks/index-sessions.sh ~/.claude/hooks/
-```
-
-Or update a single file:
-```bash
-cp skills/recall/workflows/recall.md ~/.claude/skills/recall/workflows/
 ```
 
 ## Requirements
@@ -145,7 +159,7 @@ cp skills/recall/workflows/recall.md ~/.claude/skills/recall/workflows/
 - Python 3.10+
 - Claude Code with hooks support
 - Obsidian vault
-- (Optional) [ir](https://github.com/vlwkaos/ir) for topic search
+- (Optional) [ir](https://github.com/vlwkaos/ir) + Rust 1.80+ for topic search
 - (Optional) networkx + pyvis for graph visualization
 
 ## License
