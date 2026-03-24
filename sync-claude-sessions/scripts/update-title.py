@@ -142,7 +142,8 @@ def generate_title(messages: list[str], assistant_lines: list[str]) -> str | Non
 
 def find_session_markdown(vault_dir: Path, session_id: str) -> Path | None:
     """Find the markdown file for a session."""
-    sessions_dir = vault_dir / "Claude-Sessions"
+    sessions_dir_env = os.environ.get("VAULT_SESSIONS_DIR")
+    sessions_dir = Path(sessions_dir_env) if sessions_dir_env else vault_dir / "Claude-Sessions"
     if not sessions_dir.exists():
         return None
     short_id = session_id[:8]

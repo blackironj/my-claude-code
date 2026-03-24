@@ -23,6 +23,8 @@ This is the only file that differs per machine:
 cat > ~/.claude/env << 'EOF'
 # Claude Code environment — sourced by all hooks
 export VAULT_DIR="/path/to/your/obsidian-vault"
+export VAULT_SESSIONS_DIR="$VAULT_DIR/ai-agent/Claude-Sessions"
+export DOCS_DIR="$VAULT_DIR/workspace"
 EOF
 ```
 
@@ -93,7 +95,7 @@ cargo install --path .
 ir preprocessor add ko lindera-tokenize
 
 # Register collection
-ir collection add sessions "$VAULT_DIR/Claude-Sessions/"
+ir collection add sessions "$VAULT_SESSIONS_DIR/"
 
 # Bind preprocessor + build index
 ir preprocessor bind ko sessions

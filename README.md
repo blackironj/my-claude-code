@@ -52,8 +52,16 @@ cat > ~/.claude/env << 'EOF'
 # Claude Code environment — sourced by all hooks
 # Change this per machine
 export VAULT_DIR="/path/to/your/obsidian-vault"
+export VAULT_SESSIONS_DIR="$VAULT_DIR/ai-agent/Claude-Sessions"
+export DOCS_DIR="$VAULT_DIR/workspace"
 EOF
 ```
+
+| Variable | Description |
+|----------|-------------|
+| `VAULT_DIR` | Obsidian vault root |
+| `VAULT_SESSIONS_DIR` | Where Claude session markdown files are synced |
+| `DOCS_DIR` | Where `/save-doc` writes documents |
 
 This is the only file that differs per PC. All hooks source it automatically.
 
@@ -122,7 +130,7 @@ ir preprocessor add ko lindera-tokenize
 
 # Register collection and build index
 source ~/.claude/env
-ir collection add sessions "$VAULT_DIR/Claude-Sessions/"
+ir collection add sessions "$VAULT_SESSIONS_DIR/"
 ir preprocessor bind ko sessions
 ir update
 ```

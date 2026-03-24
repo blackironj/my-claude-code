@@ -55,7 +55,7 @@ For remote sessions (no local JSONL), expand automatically falls back to Obsidia
 **Deep context** — read the full synced session markdown from Obsidian vault:
 
 ```bash
-. ~/.claude/env && ls "$VAULT_DIR/Claude-Sessions/"*SESSION_ID_PREFIX*
+. ~/.claude/env && ls "$VAULT_SESSIONS_DIR/"*SESSION_ID_PREFIX*
 # Then Read the matched file
 ```
 
@@ -174,7 +174,7 @@ Tell the user the node/edge counts and what to look for (clusters, shared files)
 
 ## Notes
 
-- **Always prefix commands with `. ~/.claude/env &&`** — this injects `VAULT_DIR` for Obsidian access
+- **Always prefix commands with `. ~/.claude/env &&`** — this injects `VAULT_DIR`, `VAULT_SESSIONS_DIR` for Obsidian access
 - `recall-day.py` scans local JSONL first, then Obsidian for remote sessions (auto-dedup by session ID)
 - Graph queries go through `session-graph.py` (NetworkX + pyvis)
 - Topic queries use BM25 (`ir search --mode bm25`) - fast keyword search with Korean support

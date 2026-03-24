@@ -35,8 +35,8 @@ cargo install --path .
 ir preprocessor add ko lindera-tokenize
 # macOS: ir preprocessor install ko
 
-# 3. Register collection (set VAULT_DIR to your Obsidian vault path)
-ir collection add sessions "$VAULT_DIR/Claude-Sessions/"
+# 3. Register collection
+ir collection add sessions "$VAULT_SESSIONS_DIR/"
 ir preprocessor bind ko sessions  # skip if no ko preprocessor
 ir update
 ```

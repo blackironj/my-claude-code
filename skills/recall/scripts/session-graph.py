@@ -35,6 +35,9 @@ def _detect_vault_prefix():
     if os.environ.get("VAULT_DIR"):
         p = os.environ["VAULT_DIR"]
         return p if p.endswith("/") else p + "/"
+    if os.environ.get("VAULT_SESSIONS_DIR"):
+        p = str(Path(os.environ["VAULT_SESSIONS_DIR"]).parent)
+        return p if p.endswith("/") else p + "/"
     # Walk up from CWD looking for .obsidian/ directory
     cwd = Path.cwd()
     for parent in [cwd, *cwd.parents]:

@@ -19,18 +19,18 @@ If unclear, ask: "어떤 내용을 저장할까요?"
 
 ## Step 2: Infer Save Path
 
-**Base directory:** `$VAULT_DIR/workspace/`
+**Base directory:** `$DOCS_DIR/`
 
 Load env and scan existing structure:
 
 ```bash
-. ~/.claude/env && find "$VAULT_DIR/workspace/" -maxdepth 4 -type d 2>/dev/null
+. ~/.claude/env && find "$DOCS_DIR/" -maxdepth 4 -type d 2>/dev/null
 ```
 
 Also scan existing files in the likely target folder to match their style:
 
 ```bash
-. ~/.claude/env && ls "$VAULT_DIR/workspace/TARGET_FOLDER/" 2>/dev/null
+. ~/.claude/env && ls "$DOCS_DIR/TARGET_FOLDER/" 2>/dev/null
 ```
 
 **Path inference — scan existing structure, don't hardcode:**
@@ -85,7 +85,7 @@ Content organized with tables, code blocks as appropriate
 Resolve the full path first, then save with the Write tool:
 
 ```bash
-. ~/.claude/env && mkdir -p "$VAULT_DIR/workspace/PARENT_DIR" && echo "$VAULT_DIR/workspace/PATH"
+. ~/.claude/env && mkdir -p "$DOCS_DIR/PARENT_DIR" && echo "$DOCS_DIR/PATH"
 ```
 
 Then use the Write tool to create the file at the resolved absolute path.

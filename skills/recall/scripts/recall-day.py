@@ -25,8 +25,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from common import STRIP_PATTERNS, clean_content, extract_text, local_tz as _local_tz
 
 CLAUDE_PROJECTS = Path.home() / ".claude" / "projects"
+VAULT_SESSIONS_DIR = os.environ.get('VAULT_SESSIONS_DIR', '')
 VAULT_DIR = os.environ.get('VAULT_DIR', '')
-OBSIDIAN_SESSIONS = Path(VAULT_DIR) / "Claude-Sessions" if VAULT_DIR else None
+OBSIDIAN_SESSIONS = Path(VAULT_SESSIONS_DIR) if VAULT_SESSIONS_DIR else (Path(VAULT_DIR) / "Claude-Sessions" if VAULT_DIR else None)
 
 
 def parse_frontmatter(filepath: Path) -> dict | None:

@@ -224,9 +224,9 @@ def _detect_sessions_dir():
     return projects
 
 VAULT_DIR = _detect_vault_dir()
-OUTPUT_DIR = VAULT_DIR / "Claude-Sessions"
+OUTPUT_DIR = Path(os.environ["VAULT_LOCAL_SESSIONS_DIR"]) if os.environ.get("VAULT_LOCAL_SESSIONS_DIR") else VAULT_DIR / "Claude-Sessions"
 SKILLS_DIR = VAULT_DIR / ".claude" / "skills"
-SESSIONS_DIR = _detect_sessions_dir()
+LOCAL_LOCAL_SESSIONS_DIR = _detect_sessions_dir()
 
 PRESERVED_FIELDS = {"comments", "projects", "status", "tags", "rating", "title", "title_source"}
 PRESERVED_SECTION = "## My Notes"
@@ -742,7 +742,7 @@ def sync_session(session_id: str, transcript_path: str | None = None, quiet: boo
     if transcript_path:
         jsonl_path = Path(transcript_path)
     else:
-        jsonl_path = SESSIONS_DIR / f"{session_id}.jsonl"
+        jsonl_path = LOCAL_SESSIONS_DIR / f"{session_id}.jsonl"
 
     if not jsonl_path.exists() or jsonl_path.stat().st_size == 0:
         return None
@@ -1030,11 +1030,11 @@ def cmd_export(args):
         print(f"Found {len(sessions)} sessions from {scope}")
     elif args.today:
         cutoff = time.time() - 86400
-        sessions = [f for f in SESSIONS_DIR.glob("*.jsonl")
+        sessions = [f for f in LOCAL_SESSIONS_DIR.glob("*.jsonl")
                     if f.stat().st_mtime >= cutoff and f.stat().st_size > 0]
         print(f"Found {len(sessions)} sessions from today")
     elif args.all:
-        sessions = [f for f in SESSIONS_DIR.glob("*.jsonl") if f.stat().st_size > 0]
+        sessions = [f for f in LOCAL_SESSIONS_DIR.glob("*.jsonl") if f.stat().st_size > 0]
         print(f"Found {len(sessions)} total sessions")
     else:
         sessions = [Path(args.file)]
