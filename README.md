@@ -55,6 +55,7 @@ export VAULT_DIR="/path/to/your/obsidian-vault"
 export VAULT_SESSIONS_DIR="$VAULT_DIR/ai-agent/Claude-Sessions"
 export DOCS_DIR="$VAULT_DIR/workspace"
 export CLAUDE_SESSIONS_TZ="Asia/Seoul"
+export MACHINE_NAME="home-pc"
 EOF
 ```
 
@@ -64,6 +65,7 @@ EOF
 | `VAULT_SESSIONS_DIR` | Where Claude session markdown files are synced |
 | `DOCS_DIR` | Where `/save-doc` writes documents |
 | `CLAUDE_SESSIONS_TZ` | Timezone for session timestamps (default: `Asia/Seoul`) |
+| `MACHINE_NAME` | Machine identifier written to session frontmatter (optional) |
 
 This is the only file that differs per PC. All hooks source it automatically.
 
