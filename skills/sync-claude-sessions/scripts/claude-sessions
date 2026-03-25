@@ -224,7 +224,7 @@ def _detect_sessions_dir():
     return projects
 
 VAULT_DIR = _detect_vault_dir()
-OUTPUT_DIR = Path(os.environ["VAULT_LOCAL_SESSIONS_DIR"]) if os.environ.get("VAULT_LOCAL_SESSIONS_DIR") else VAULT_DIR / "Claude-Sessions"
+OUTPUT_DIR = Path(os.environ["VAULT_SESSIONS_DIR"]) if os.environ.get("VAULT_SESSIONS_DIR") else VAULT_DIR / "Claude-Sessions"
 SKILLS_DIR = VAULT_DIR / ".claude" / "skills"
 LOCAL_LOCAL_SESSIONS_DIR = _detect_sessions_dir()
 
