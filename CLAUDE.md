@@ -6,14 +6,47 @@ Personal Claude Code skills for session memory, recall, and ideation with Obsidi
 
 ```
 skills/
-  ideate/           — Lightweight collaborative ideation skill
-  recall/           — Session recall with temporal, topic, and graph modes
-  save-doc/         — Save content to Obsidian vault
-  sync-claude-sessions/ — Export sessions to Obsidian markdown
-  shared_utils.py   — Shared Python utilities
-hooks/              — SessionEnd hook for ir auto-indexing
-docs/               — Spec and plan documents from superpowers workflows
+  ideate/SKILL.md                        — Lightweight collaborative ideation (markdown-only)
+  recall/
+    SKILL.md                             — Session recall skill
+    scripts/recall-day.py                — Temporal recall (date-based)
+    scripts/session-graph.py             — Graph visualization
+    scripts/common.py                    — Shared recall utilities
+    workflows/recall.md                  — Routing logic and presentation rules
+  save-doc/SKILL.md                      — Save content to Obsidian vault (markdown-only)
+  sync-claude-sessions/
+    SKILL.md                             — Session export skill
+    scripts/update-title.py              — Title update script
+    workflows/setup.md                   — Setup guide
+    workflows/log-session.md             — Session logging workflow
+  shared_utils.py                        — Shared Python utilities across skills
+hooks/
+  index-sessions.sh                      — SessionEnd hook for ir auto-indexing
 ```
+
+## Development Workflow
+
+```bash
+# 1. Edit skill in this repo
+vim skills/ideate/SKILL.md
+
+# 2. Copy to installed location
+cp -r skills/ideate ~/.claude/skills/ideate
+
+# 3. Verify — skill list should show changes
+# (restart session or /reload-plugins)
+```
+
+For script-based skills (recall, sync-claude-sessions), the main script `claude-sessions` is not in this repo — it lives at `~/.claude/skills/sync-claude-sessions/scripts/claude-sessions`. When pulling updates from this repo, copy changed files to the installed location.
+
+## Skill Types
+
+| Type | Example | Contains |
+|------|---------|----------|
+| Markdown-only | ideate, save-doc | `SKILL.md` only |
+| Script-based | recall, sync-claude-sessions | `SKILL.md` + `scripts/` + `workflows/` |
+
+Markdown-only skills just need `SKILL.md` copied. Script-based skills need the entire directory.
 
 ## Skill Conventions
 
@@ -31,9 +64,12 @@ Skills depend on `~/.claude/env` for vault paths:
 - `DOCS_DIR` — Document output for save-doc
 - `MACHINE_NAME` — Machine identifier in session frontmatter
 
-## Installation
+## Gotchas
 
-Skills in this repo are copied to `~/.claude/skills/` for use. After editing a skill here, copy it to the installed location to apply changes.
+- **Repo ≠ installed**: Editing here does NOT auto-apply. Must copy to `~/.claude/skills/` manually.
+- **`docs/` is gitignored**: `docs/superpowers/`, `docs/specs/`, `docs/plans/` are in `.gitignore` — they're local superpowers artifacts, not tracked.
+- **Root `sync-claude-sessions/`**: Legacy duplicate of `skills/sync-claude-sessions/scripts/`. Ignore it.
+- **`shared_utils.py` location**: Lives at `skills/shared_utils.py`, not inside any skill directory. Imported by recall scripts.
 
 ## Python Scripts
 
