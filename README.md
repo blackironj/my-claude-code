@@ -25,6 +25,15 @@ Load context from previous sessions. Three modes:
 
 Ends every recall with **One Thing** — the single highest-leverage next action.
 
+### ideate
+
+Lightweight collaborative ideation skill. Alternative to superpowers:brainstorming for open-ended exploration without forced spec/plan/implementation pipeline.
+
+- Natural dialogue, not process checklist
+- Diverge freely, converge when the user is ready
+- No mandatory output — the conversation itself is the value
+- Triggers: `/ideate`, "같이 생각해보자", "이건 어때", "explore ideas"
+
 ### save-doc
 
 Save session content (analysis, specs, designs) to Obsidian vault.
@@ -153,6 +162,7 @@ cd my-claude-skills
 cp -r skills/recall ~/.claude/skills/
 cp -r skills/sync-claude-sessions ~/.claude/skills/
 cp -r skills/save-doc ~/.claude/skills/
+cp -r skills/ideate ~/.claude/skills/
 
 # Install SessionEnd hook
 mkdir -p ~/.claude/hooks
