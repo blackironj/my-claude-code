@@ -168,13 +168,14 @@ def derive_title(user_messages: list[str], max_len: int = 80) -> str:
     """
     for msg in user_messages:
         candidate = msg.replace("\n", " ").strip()
-        candidate = re.sub(r'^#+\s*', '', candidate)
-        if candidate.startswith("Base directory for this skill:"):
-            continue
+        # Handle "## Continue:" before stripping headers
         if candidate.startswith("## Continue:"):
             m = re.match(r'## Continue:\s*(.+?)(?:\n|$)', msg)
             if m:
                 candidate = m.group(1).strip()
+        candidate = re.sub(r'^#+\s*', '', candidate)
+        if candidate.startswith("Base directory for this skill:"):
+            continue
         if len(candidate) < 3:
             continue
         if len(candidate) > max_len:
