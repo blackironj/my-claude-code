@@ -22,43 +22,13 @@ from pathlib import Path
 
 # Add scripts dir to path for common module
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from common import STRIP_PATTERNS, clean_content, extract_text, local_tz as _local_tz
+from common import STRIP_PATTERNS, clean_content, extract_text, local_tz as _local_tz, parse_frontmatter_file, parse_iso_timestamp, derive_title
 
 CLAUDE_PROJECTS = Path.home() / ".claude" / "projects"
 VAULT_SESSIONS_DIR = os.environ.get('VAULT_SESSIONS_DIR', '')
 VAULT_DIR = os.environ.get('VAULT_DIR', '')
 OBSIDIAN_SESSIONS = Path(VAULT_SESSIONS_DIR) if VAULT_SESSIONS_DIR else (Path(VAULT_DIR) / "Claude-Sessions" if VAULT_DIR else None)
 
-
-def parse_frontmatter(filepath: Path) -> dict | None:
-    """Parse YAML frontmatter from a markdown file without PyYAML dependency."""
-    try:
-        with open(filepath, encoding='utf-8') as f:
-            first_line = f.readline().strip()
-            if first_line != '---':
-                return None
-            lines = []
-            for line in f:
-                if line.strip() == '---':
-                    break
-                lines.append(line)
-            else:
-                return None  # No closing ---
-
-        result = {}
-        for line in lines:
-            m = re.match(r'^(\w[\w_-]*)\s*:\s*(.+)$', line)
-            if m:
-                key = m.group(1)
-                val = m.group(2).strip().strip('"').strip("'")
-                if val == 'null':
-                    val = None
-                elif val.isdigit():
-                    val = int(val)
-                result[key] = val
-        return result
-    except (OSError, UnicodeDecodeError):
-        return None
 
 
 def scan_obsidian_sessions(date_start: datetime, date_end: datetime) -> list[dict]:
@@ -74,7 +44,7 @@ def scan_obsidian_sessions(date_start: datetime, date_end: datetime) -> list[dic
     while current < end:
         date_str = current.strftime('%Y-%m-%d')
         for md_file in OBSIDIAN_SESSIONS.glob(f"{date_str}-*.md"):
-            fm = parse_frontmatter(md_file)
+            fm = parse_frontmatter_file(md_file)
             if not fm:
                 continue
 
@@ -87,7 +57,7 @@ def scan_obsidian_sessions(date_start: datetime, date_end: datetime) -> list[dic
             start_time = None
             if last_activity:
                 try:
-                    start_time = datetime.fromisoformat(last_activity.replace('Z', '+00:00')).astimezone(_local_tz())
+                    start_time = parse_iso_timestamp(last_activity, _local_tz())
                 except (ValueError, TypeError):
                     pass
             if not start_time:
@@ -219,7 +189,7 @@ def scan_session_metadata(filepath: Path, date_start: datetime, date_end: dateti
                 ts_str = obj.get('timestamp')
                 if ts_str and not start_time:
                     try:
-                        start_time = datetime.fromisoformat(ts_str.replace('Z', '+00:00')).astimezone(_local_tz())
+                        start_time = parse_iso_timestamp(ts_str, _local_tz())
                     except (ValueError, TypeError):
                         pass
 
@@ -253,18 +223,7 @@ def scan_session_metadata(filepath: Path, date_start: datetime, date_end: dateti
         return None
 
     # Derive title from first message
-    title = "Untitled"
-    if first_user_msg:
-        first_line = first_user_msg.split('\n')[0].strip()
-        first_line = re.sub(r'^#+\s*', '', first_line)
-        if first_line.startswith('## Continue:'):
-            m = re.match(r'## Continue:\s*(.+?)(?:\n|$)', first_user_msg)
-            if m:
-                first_line = m.group(1).strip()
-        if len(first_line) > 80:
-            first_line = first_line[:77] + '...'
-        if len(first_line) >= 3:
-            title = first_line
+    title = derive_title([first_user_msg] if first_user_msg else [])
 
     return {
         'session_id': session_id,
@@ -454,7 +413,7 @@ def cmd_expand(args):
             ts_label = ''
             if ts_str:
                 try:
-                    dt = datetime.fromisoformat(ts_str.replace('Z', '+00:00')).astimezone(_local_tz())
+                    dt = parse_iso_timestamp(ts_str, _local_tz())
                     ts_label = dt.strftime('%H:%M')
                 except (ValueError, TypeError):
                     pass

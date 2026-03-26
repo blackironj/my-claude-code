@@ -136,7 +136,7 @@ def extract_file_paths(jsonl_path: Path) -> dict | None:
                 ts_str = obj.get('timestamp')
                 if ts_str and not start_time:
                     try:
-                        start_time = datetime.fromisoformat(ts_str.replace('Z', '+00:00')).astimezone(recall_day._local_tz())
+                        start_time = recall_day.parse_iso_timestamp(ts_str, recall_day._local_tz())
                     except (ValueError, TypeError):
                         pass
 
