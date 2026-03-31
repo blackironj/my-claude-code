@@ -30,7 +30,35 @@ VAULT_DIR = os.environ.get('VAULT_DIR', '')
 OBSIDIAN_SESSIONS = Path(VAULT_SESSIONS_DIR) if VAULT_SESSIONS_DIR else (Path(VAULT_DIR) / "Claude-Sessions" if VAULT_DIR else None)
 
 
-def scan_obsidian_sessions(date_start: datetime, date_end: datetime) -> list[dict]:
+def build_project_index() -> dict[Path, str]:
+    """Build project_dir -> project_name mapping from JSONL cwd fields.
+
+    Reads the first record of the most recent JSONL in each project directory
+    to extract the cwd, then uses Path(cwd).name as the project name.
+    """
+    index = {}
+    if not CLAUDE_PROJECTS.is_dir():
+        return index
+    for proj_dir in CLAUDE_PROJECTS.iterdir():
+        if not proj_dir.is_dir():
+            continue
+        jsonl_files = sorted(proj_dir.glob("*.jsonl"),
+                           key=lambda f: f.stat().st_mtime, reverse=True)
+        for jf in jsonl_files[:1]:
+            try:
+                with open(jf) as f:
+                    for line in f:
+                        obj = json.loads(line)
+                        cwd = obj.get("cwd")
+                        if cwd:
+                            index[proj_dir] = Path(cwd).name
+                            break
+            except (OSError, json.JSONDecodeError):
+                continue
+    return index
+
+
+def scan_obsidian_sessions(date_start: datetime, date_end: datetime, project_name: str | None = None) -> list[dict]:
     """Scan Obsidian Claude-Sessions for the given date range. Returns session metadata list."""
     if not OBSIDIAN_SESSIONS or not OBSIDIAN_SESSIONS.exists():
         return []
@@ -46,6 +74,14 @@ def scan_obsidian_sessions(date_start: datetime, date_end: datetime) -> list[dic
             fm = parse_frontmatter_file(md_file)
             if not fm:
                 continue
+
+            # Project name filter
+            if project_name:
+                fm_projects = fm.get('projects', [])
+                if not isinstance(fm_projects, list):
+                    fm_projects = []
+                if not any(project_name.lower() in p.lower() for p in fm_projects):
+                    continue
 
             session_id = fm.get('session_id', md_file.stem.split('-', 3)[-1] if '-' in md_file.stem else md_file.stem)
             title = fm.get('title', 'Untitled')
@@ -147,8 +183,18 @@ def parse_date_expr(expr: str) -> tuple[datetime, datetime]:
     sys.exit(1)
 
 
-def get_project_dirs(project_path: str | None, all_projects: bool) -> list[Path]:
-    """Get list of project directories to scan."""
+def get_project_dirs(project_path: str | None, all_projects: bool, name: str | None = None) -> list[Path]:
+    """Get list of project directories to scan.
+
+    Args:
+        project_path: Exact project path (existing --project flag)
+        all_projects: Scan all projects
+        name: Project name substring filter (new --name flag)
+    """
+    if project_path and name:
+        print("Error: --project and --name cannot be used together.", file=sys.stderr)
+        sys.exit(1)
+
     if project_path:
         encoded = project_path.replace('/', '-')
         p = CLAUDE_PROJECTS / encoded
@@ -161,7 +207,16 @@ def get_project_dirs(project_path: str | None, all_projects: bool) -> list[Path]
         print(f"Error: Project path not found: {project_path}", file=sys.stderr)
         sys.exit(1)
 
-    # Default: scan all projects (recall is cross-project by nature)
+    if name:
+        index = build_project_index()
+        matched = [d for d, pname in index.items() if name.lower() in pname.lower()]
+        if not matched:
+            print(f"Error: No project matching '{name}'.", file=sys.stderr)
+            print("Run 'recall-day.py projects' to see available projects.", file=sys.stderr)
+            sys.exit(1)
+        return matched
+
+    # Default: scan all projects
     return [d for d in CLAUDE_PROJECTS.iterdir() if d.is_dir()]
 
 
@@ -247,7 +302,10 @@ def format_size(size_bytes: int) -> str:
 def cmd_list(args):
     """List sessions for a date range."""
     date_start, date_end = parse_date_expr(args.date_expr)
-    project_dirs = get_project_dirs(args.project, args.all_projects)
+    if getattr(args, 'full_history', False):
+        date_start = datetime(2020, 1, 1, tzinfo=_local_tz())
+        date_end = datetime.now(_local_tz()) + timedelta(days=1)
+    project_dirs = get_project_dirs(args.project, args.all_projects, getattr(args, 'name', None))
 
     sessions = []
     noise_count = 0
@@ -281,7 +339,7 @@ def cmd_list(args):
 
     # 2. Obsidian scan (supplementary — catches sessions from other computers)
     local_ids = {s['session_id'][:8] for s in sessions}
-    obsidian_sessions = scan_obsidian_sessions(date_start, date_end)
+    obsidian_sessions = scan_obsidian_sessions(date_start, date_end, getattr(args, 'name', None))
     remote_count = 0
     for obs in obsidian_sessions:
         obs_id_short = obs['session_id'][:8]
@@ -466,10 +524,12 @@ def main():
 
     # list
     p_list = sub.add_parser('list', help='List sessions for a date')
-    p_list.add_argument('date_expr', nargs='+', help='Date expression (e.g. yesterday, today, 2026-02-25)')
+    p_list.add_argument('date_expr', nargs='*', help='Date expression (e.g. yesterday, today, 2026-02-25)')
     p_list.add_argument('--project', help='Project path to scan')
     p_list.add_argument('--all-projects', action='store_true', help='Scan all projects')
     p_list.add_argument('--min-msgs', type=int, default=3, help='Min user messages (default: 3)')
+    p_list.add_argument('--name', help='Filter by project name (substring match)')
+    p_list.add_argument('--full-history', action='store_true', dest='full_history', help='Show full history (use with --name)')
 
     # expand
     p_expand = sub.add_parser('expand', help='Expand a session by ID')
@@ -482,7 +542,15 @@ def main():
 
     if args.command == 'list':
         # Join multi-word date expressions
-        args.date_expr = ' '.join(args.date_expr)
+        if args.date_expr:
+            args.date_expr = ' '.join(args.date_expr)
+        elif args.name:
+            # --name without date_expr defaults to last 14 days
+            args.date_expr = 'last 14 days'
+        elif args.full_history:
+            args.date_expr = 'last 3650 days'
+        else:
+            parser.error("date_expr is required (or use --name for project filtering)")
         cmd_list(args)
     elif args.command == 'expand':
         cmd_expand(args)
