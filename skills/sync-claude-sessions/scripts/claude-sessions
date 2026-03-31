@@ -207,7 +207,9 @@ def _detect_vault_dir():
     for parent in [cwd, *cwd.parents]:
         if (parent / ".obsidian").is_dir():
             return parent
-    return cwd
+    print("Error: VAULT_DIR not set and no Obsidian vault found.", file=sys.stderr)
+    print("Run: . ~/.claude/env && cs <command>", file=sys.stderr)
+    sys.exit(1)
 
 def _detect_sessions_dir():
     """Auto-detect Claude project sessions directory from CWD."""
