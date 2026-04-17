@@ -68,39 +68,84 @@ def _find_ko_preprocessor() -> str | None:
 _KO_PREPROCESSOR = _find_ko_preprocessor()
 
 
-def _tokenize_korean(text: str) -> list[str]:
-    """Extract Korean keywords via ir's ko preprocessor.
+_KOREAN_RE = re.compile(r'[\uac00-\ud7af]')
+_WS_RE = re.compile(r'\s+')
+_EN_WORD_RE = re.compile(r'[a-zA-Z]{2,}')
 
-    Returns empty list if preprocessor unavailable or text has no Korean.
+
+def _tokenize_korean_batch(texts: list[str]) -> list[list[str]]:
+    """Tokenize multiple texts via a single lindera-tokenize subprocess call.
+
+    lindera preserves input-line to output-line 1:1 correspondence, so we
+    flatten each text to a single line (whitespace → space) and join with \\n.
+    Each text is mapped to its token list at the same index.
+
+    Per-call subprocess spawn was the sync hot-path bottleneck (~300ms × N).
     """
-    if not _KO_PREPROCESSOR:
-        return []
-    # Quick check: skip if no Korean characters
-    if not re.search(r'[\uac00-\ud7af]', text):
-        return []
+    if not _KO_PREPROCESSOR or not texts:
+        return [[] for _ in texts]
+
+    prepared: list[str] = []
+    has_korean: list[bool] = []
+    for t in texts:
+        if t and _KOREAN_RE.search(t):
+            prepared.append(_WS_RE.sub(' ', t).strip())
+            has_korean.append(True)
+        else:
+            prepared.append('')
+            has_korean.append(False)
+
+    if not any(has_korean):
+        return [[] for _ in texts]
+
     try:
+        # Timeout scales with input size: 10s base + 1s per 100KB
+        total_bytes = sum(len(p.encode('utf-8')) for p in prepared)
+        timeout = 10 + total_bytes // 102400
         result = subprocess.run(
             [_KO_PREPROCESSOR],
-            input=text,
+            input='\n'.join(prepared),
             capture_output=True,
             text=True,
-            timeout=5,
+            timeout=timeout,
         )
         if result.returncode != 0:
-            return []
-        tokens = result.stdout.strip().split()
-        # Filter: drop 1-char tokens (particles, noise) and English (already handled)
-        return [t for t in tokens if len(t) > 1 and re.search(r'[\uac00-\ud7af]', t)]
+            return [[] for _ in texts]
+        out_lines = result.stdout.split('\n')
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
-        return []
+        return [[] for _ in texts]
+
+    results: list[list[str]] = []
+    for i, had_ko in enumerate(has_korean):
+        if not had_ko or i >= len(out_lines):
+            results.append([])
+            continue
+        tokens = out_lines[i].split()
+        results.append([t for t in tokens if len(t) > 1 and _KOREAN_RE.search(t)])
+    return results
+
+
+def _tokenize_korean(text: str) -> list[str]:
+    """Single-text wrapper for backward compatibility."""
+    return _tokenize_korean_batch([text])[0]
 
 
 def _tokenize(text: str) -> list[str]:
-    """Tokenize text into English + Korean keywords."""
-    en_tokens = [w for w in re.findall(r'[a-zA-Z]{2,}', text.lower())
+    """Tokenize text into English + Korean keywords (single-text)."""
+    en_tokens = [w for w in _EN_WORD_RE.findall(text.lower())
                  if w not in _STOP_WORDS]
     ko_tokens = _tokenize_korean(text)
     return en_tokens + ko_tokens
+
+
+def _tokenize_batch(texts: list[str]) -> list[list[str]]:
+    """Batch-tokenize multiple texts (en + ko). Single subprocess call for ko."""
+    ko_results = _tokenize_korean_batch(texts)
+    out: list[list[str]] = []
+    for text, ko in zip(texts, ko_results):
+        en = [w for w in _EN_WORD_RE.findall(text.lower()) if w not in _STOP_WORDS]
+        out.append(en + ko)
+    return out
 
 
 def _build_corpus_df() -> dict[str, int]:
@@ -109,18 +154,19 @@ def _build_corpus_df() -> dict[str, int]:
     df: dict[str, int] = {}
     if not OUTPUT_DIR.exists():
         return df
+    contents: list[str] = []
     for f in OUTPUT_DIR.glob("*.md"):
         try:
             content = f.read_text(encoding="utf-8")
-            # Extract conversation section only (skip frontmatter/artifacts)
             conv_start = content.find("## Conversation")
             if conv_start >= 0:
                 content = content[conv_start:]
-            words_in_doc = set(_tokenize(content))
-            for w in words_in_doc:
-                df[w] = df.get(w, 0) + 1
+            contents.append(content)
         except Exception:
-            continue
+            contents.append("")
+    for tokens in _tokenize_batch(contents):
+        for w in set(tokens):
+            df[w] = df.get(w, 0) + 1
     return df
 
 
@@ -134,8 +180,8 @@ def extract_keywords(conversation: list[dict], max_keywords: int = 3) -> list[st
     global _corpus_cache, _corpus_doc_count
 
     tf: dict[str, int] = {}
-    for turn in conversation:
-        for word in _tokenize(turn["text"]):
+    for tokens in _tokenize_batch([turn["text"] for turn in conversation]):
+        for word in tokens:
             tf[word] = tf.get(word, 0) + 1
     if not tf:
         return []
