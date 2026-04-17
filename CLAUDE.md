@@ -31,7 +31,7 @@ hooks/
 Skills are installed by copying to `~/.claude/skills/`. Symlink recommended for development:
 
 ```bash
-ln -s ~/workspace/my/claude-code-skills/skills/* ~/.claude/skills/
+ln -s "$(pwd)/skills/"* ~/.claude/skills/
 ```
 
 ## Skill Types
@@ -40,6 +40,13 @@ ln -s ~/workspace/my/claude-code-skills/skills/* ~/.claude/skills/
 |------|---------|----------|
 | Markdown-only | ideate, save-doc | `SKILL.md` only |
 | Script-based | recall, sync-claude-sessions | `SKILL.md` + `scripts/` + `workflows/` |
+
+## CLI Commands
+
+- `scripts/claude-sessions {sync|export|resume|note|close|list|log}` — session management
+- `scripts/recall-day.py` — date-based temporal recall
+- `scripts/session-graph.py` — graph visualization (needs `networkx`, `pyvis`)
+- Recall modes: temporal / project / topic (BM25 via `ir`) / graph
 
 ## Skill Conventions
 
@@ -55,6 +62,7 @@ Skills depend on `~/.claude/env` for vault paths:
 - `VAULT_DIR` — Obsidian vault root
 - `VAULT_SESSIONS_DIR` — Session markdown output
 - `DOCS_DIR` — Document output for save-doc
+- `CLAUDE_SESSIONS_TZ` — Timezone for session timestamps (default: `Asia/Seoul`)
 - `MACHINE_NAME` — Machine identifier in session frontmatter
 
 ## Python Scripts
@@ -66,3 +74,6 @@ Skills depend on `~/.claude/env` for vault paths:
 ## Gotchas
 
 - **`docs/` is gitignored**: `docs/superpowers/`, `docs/specs/`, `docs/plans/` are local superpowers artifacts, not tracked.
+- **Sync hook timeout**: `UserPromptSubmit` + `Stop` hooks run `claude-sessions sync` with a 10s budget. Lindera-tokenize calls are batched (commit `af7a5cf`) — don't reintroduce per-file subprocess loops.
+- **ir is optional but indexed via SessionEnd hook**: `hooks/index-sessions.sh` runs `ir update` only if `ir` is on PATH. Topic recall silently falls back to temporal mode when ir is missing.
+- **No test suite**: unit tests were removed (commit `ac22317`) — verify changes by running the scripts directly against a live vault.

@@ -34,23 +34,25 @@ Lightweight collaborative ideation. Alternative to superpowers:brainstorming for
 
 ### save-doc
 
-Save session content (analysis, specs, designs) to Obsidian vault.
+Save session content (analysis, specs, designs) to Obsidian vault under `$DOCS_DIR`.
+
+- Triggers: `/save-doc`, "저장해줘", "vault에 넣어줘", "save this", "export to vault"
 
 ## Requirements
 
 - Python 3.10+
 - Claude Code with hooks support
 - Obsidian vault
-- (Optional) [ir](https://github.com/vlwkaos/ir) + Rust 1.80+ for topic search
-- (Optional) networkx + pyvis for graph visualization
+- (Optional) [ir](https://github.com/vlwkaos/ir) for topic search — needs Rust 1.80+, `libclang-dev`, `cmake`
+- (Optional) `pip install networkx pyvis` for graph visualization
 
 ## Installation
 
 ### Step 1: Install skills
 
 ```bash
-git clone https://github.com/blackironj/my-claude-skills.git
-cd my-claude-skills
+git clone https://github.com/blackironj/my-claude-code.git
+cd my-claude-code
 
 # Symlink (recommended — edits apply immediately)
 ln -s "$(pwd)/skills/"* ~/.claude/skills/
