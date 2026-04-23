@@ -106,10 +106,27 @@ def group_by_date(sessions: list[dict]) -> dict[str, list[dict]]:
 
 
 def build_section(sessions: list[dict]) -> str:
-    """Build the ## Claude Sessions section content."""
+    """Build the ## Claude Sessions section, grouped by project."""
     lines = [SECTION_HEADING]
+
+    # Group by project
+    by_project: dict[str, list[dict]] = {}
     for s in sessions:
-        lines.append(format_session_line(s["stem"], s["title"], s["time"], s["project"]))
+        proj = s["project"] or "other"
+        by_project.setdefault(proj, []).append(s)
+
+    if len(by_project) <= 1:
+        # Single project or no project — flat list
+        for s in sessions:
+            lines.append(format_session_line(s["stem"], s["title"], s["time"], s["project"]))
+    else:
+        # Multiple projects — group with subheadings
+        for proj in sorted(by_project.keys()):
+            proj_sessions = by_project[proj]
+            lines.append(f"**[[{proj}]]**")
+            for s in proj_sessions:
+                lines.append(format_session_line(s["stem"], s["title"], s["time"], None))
+
     return "\n".join(lines)
 
 
@@ -128,8 +145,9 @@ def update_daily_note(daily_path: Path, section: str, dry_run: bool) -> str:
     content = daily_path.read_text(encoding="utf-8")
 
     # Check if section already exists — replace it
+    # Matches heading + any mix of list items, bold project headers, and blank lines
     pattern = re.compile(
-        r"^## Claude Sessions\n(?:- .+\n?)*",
+        r"^## Claude Sessions\n(?:(?:- .+|\*\*.+\*\*)\n?)*",
         re.MULTILINE,
     )
     if pattern.search(content):

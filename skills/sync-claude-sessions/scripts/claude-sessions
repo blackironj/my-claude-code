@@ -447,7 +447,32 @@ def extract_session_data(records: list[dict]) -> dict:
     # Detect if continuation session
     data["is_continuation"] = detect_continuation(records)
 
+    # Classify session type: interactive vs automated
+    data["session_type"] = _classify_session(records, data)
+
     return data
+
+
+_AUTOMATED_PATTERNS = re.compile(
+    r"^(?:/loop|/schedule|<<autonomous-loop|automated |cron |scheduled )",
+    re.IGNORECASE,
+)
+
+
+def _classify_session(records: list[dict], data: dict) -> str:
+    """Classify session as interactive or automated."""
+    # Agent-spawned sessions
+    for r in records:
+        if r.get("sessionId", "").startswith("agent-"):
+            return "automated"
+    # First user message matches automation patterns
+    first_msg = data["user_messages"][0] if data["user_messages"] else ""
+    if _AUTOMATED_PATTERNS.search(first_msg):
+        return "automated"
+    # Very short sessions with no real interaction
+    if data["messages"] <= 1 and not data["user_messages"]:
+        return "automated"
+    return "interactive"
 
 
 # =============================================================================
@@ -476,6 +501,7 @@ def generate_markdown(data: dict, session_id: str, existing_fm: dict | None = No
     # Frontmatter
     lines.append("---")
     lines.append("type: claude-session")
+    lines.append(f"session_type: {data.get('session_type', 'interactive')}")
     lines.append(f"date: {data['date']}")
     lines.append(f"session_id: {session_id}")
     lines.append(f"timezone: {LOCAL_TZ}")
@@ -1197,6 +1223,85 @@ def cmd_list(args):
     return 0
 
 
+def cmd_lint(args):
+    """Lint command - check vault/JSONL consistency."""
+    issues = []
+
+    # L001: Vault MD files without matching JSONL (orphan markdown)
+    vault_sessions = {}
+    if OUTPUT_DIR.exists():
+        for f in OUTPUT_DIR.glob("*.md"):
+            fm = parse_frontmatter(f.read_text(encoding="utf-8"))
+            sid = fm.get("session_id", "")
+            if sid:
+                vault_sessions[sid] = f
+
+    # L002: JSONL files without vault MD (unsynced)
+    all_jsonl = _find_all_project_sessions()
+    jsonl_ids = {}
+    for jp in all_jsonl:
+        sid = jp.stem
+        if not sid.startswith("agent-"):
+            jsonl_ids[sid] = jp
+
+    orphan_md = set(vault_sessions.keys()) - set(jsonl_ids.keys())
+    unsynced = set(jsonl_ids.keys()) - set(vault_sessions.keys())
+
+    for sid in sorted(orphan_md):
+        issues.append(f"L001 orphan-md: {vault_sessions[sid].name} (no JSONL found)")
+
+    for sid in sorted(unsynced):
+        jp = jsonl_ids[sid]
+        if jp.stat().st_size > 0:
+            issues.append(f"L002 unsynced: {jp.name} (no vault MD)")
+
+    # L003: Missing required frontmatter fields
+    required = {"type", "date", "session_id", "title", "status"}
+    for sid, f in sorted(vault_sessions.items()):
+        fm = parse_frontmatter(f.read_text(encoding="utf-8"))
+        missing = required - set(fm.keys())
+        if missing:
+            issues.append(f"L003 missing-fields: {f.name} — {', '.join(sorted(missing))}")
+
+    # L004: Daily note consistency
+    daily_dir = VAULT_DIR / "Daily Notes"
+    if daily_dir.exists():
+        dates_with_sessions = set()
+        for sid, f in vault_sessions.items():
+            fm = parse_frontmatter(f.read_text(encoding="utf-8"))
+            d = fm.get("date", "")
+            if d:
+                dates_with_sessions.add(d)
+        for d in sorted(dates_with_sessions):
+            daily_path = daily_dir / f"{d}.md"
+            if not daily_path.exists():
+                issues.append(f"L004 missing-daily: {d} ({sum(1 for s, f in vault_sessions.items() if parse_frontmatter(f.read_text(encoding='utf-8')).get('date') == d)} sessions, no daily note)")
+
+    if not issues:
+        print("All checks passed. No issues found.")
+    else:
+        for issue in issues:
+            print(issue)
+        print(f"\n{len(issues)} issues found")
+
+    if args.fix:
+        fixed = 0
+        for issue in issues:
+            if issue.startswith("L002 unsynced:"):
+                fname = issue.split(":")[1].strip().split(" ")[0]
+                sid = fname.replace(".jsonl", "")
+                jp = jsonl_ids.get(sid)
+                if jp and sync_session(sid, str(jp), quiet=True):
+                    fixed += 1
+            elif issue.startswith("L004 missing-daily:"):
+                date_str = issue.split(":")[1].strip().split(" ")[0]
+                print(f"  Run: backfill-daily.py --date {date_str}")
+        if fixed:
+            print(f"\nFixed {fixed} unsynced sessions")
+
+    return 1 if issues else 0
+
+
 # =============================================================================
 # Main
 # =============================================================================
@@ -1262,6 +1367,11 @@ def main():
     p_list.add_argument("--all", action="store_true", help="All sessions")
     p_list.add_argument("--json", action="store_true", help="JSON output")
     p_list.set_defaults(func=cmd_list)
+
+    # lint
+    p_lint = subparsers.add_parser("lint", help="Check vault/JSONL consistency")
+    p_lint.add_argument("--fix", action="store_true", help="Auto-fix unsynced sessions")
+    p_lint.set_defaults(func=cmd_lint)
 
     args = parser.parse_args()
     sys.exit(args.func(args))
