@@ -591,23 +591,23 @@ def generate_markdown(data: dict, session_id: str, existing_fm: dict | None = No
             link_parts.append(f"Prev: [[{prev}]]")
     if link_parts:
         lines.append("> " + " | ".join(link_parts))
+
+    # Skill wikilinks — cross-session clustering by skill
+    if data["skills"]:
+        lines.append("> Skills: " + " ".join(f"[[{s}]]" for s in sorted_skills))
+
+    # Topic wikilinks — cross-project clustering by keyword
+    keywords = data.get("keywords", [])
+    if keywords:
+        lines.append("> Topics: " + " ".join(f"[[{k}]]" for k in keywords))
+
+    if link_parts or data["skills"] or keywords:
         lines.append("")
 
     if data["summary"]:
         lines.append("## Summary")
         lines.append("")
         lines.append(data["summary"])
-        lines.append("")
-
-    if data["skills"]:
-        lines.append("## Skills Used")
-        lines.append("")
-        for skill in sorted_skills:
-            skill_path = get_skill_relative_path(skill)
-            if skill_path:
-                lines.append(f"- [{skill}]({skill_path})")
-            else:
-                lines.append(f"- {skill}")
         lines.append("")
 
     # Artifacts
