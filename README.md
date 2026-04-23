@@ -154,6 +154,12 @@ ir preprocessor bind ko sessions
 ir update
 ```
 
+## Roadmap
+
+- **Wiki layer** — Auto-distill repeated session topics into consolidated knowledge docs (`wiki/`). Three phases: session takeaways in daily notes → semi-auto topic pages when 3+ sessions overlap → full auto wiki maintenance. Inspired by [Karpathy's llm-wiki](https://gist.github.com/karpathy) pattern.
+- **Session canvas** — Generate `.canvas` files for native Obsidian visualization of session-file relationships.
+- **defuddle web clipper** — Web page → clean markdown → vault via [defuddle](https://github.com/kepano/defuddle).
+
 ## License
 
 MIT

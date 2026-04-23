@@ -94,5 +94,10 @@ Skills depend on `~/.claude/env` for vault paths:
 - **`docs/` is gitignored**: `docs/superpowers/`, `docs/specs/`, `docs/plans/` are local superpowers artifacts, not tracked.
 - **Sync hook timeout**: `UserPromptSubmit` + `Stop` hooks run `claude-sessions sync`. Lindera-tokenize calls are batched (commit `af7a5cf`) — don't reintroduce per-file subprocess loops.
 - **ir is optional but indexed via SessionEnd hook**: `hooks/index-sessions.sh` runs `ir update` only if `ir` is on PATH. Topic recall falls back to Obsidian search, then temporal mode.
-- **Daily note format**: `_daily_append()` writes directly to filesystem (not via Obsidian CLI) under `## Claude Sessions` heading. Same format as `backfill-daily.py`.
+- **Daily note format**: `_daily_append()` writes directly to filesystem (not via Obsidian CLI) under `## Claude Sessions` heading. Same format as `backfill-daily.py`. Multi-project days are grouped by project.
+- **Session classification**: `session_type` frontmatter field auto-classifies as `interactive` or `automated` (regex on first user message).
 - **No test suite**: unit tests were removed (commit `ac22317`) — verify changes by running the scripts directly against a live vault.
+
+## Roadmap
+
+- **Wiki layer**: Distill repeated session topics into consolidated `wiki/` docs (3-phase: takeaways → topic pages → auto-update). Inspired by Karpathy's llm-wiki pattern. See memory for detailed roadmap.
