@@ -772,6 +772,67 @@ def sync_session(session_id: str, transcript_path: str | None = None, quiet: boo
     return output_file
 
 
+_DAILY_SECTION = "## Claude Sessions"
+
+
+def _daily_append(data: dict, output_file: Path) -> bool:
+    """Append/update a session line in the daily note's ## Claude Sessions section."""
+    daily_dir = VAULT_DIR / "Daily Notes"
+    date_str = data.get("date") or datetime.now(LOCAL_TZ).strftime("%Y-%m-%d")
+    daily_path = daily_dir / f"{date_str}.md"
+
+    title = data.get("title", "Untitled")
+    project = data.get("project_name", "")
+    ts = data.get("last_timestamp")
+    if ts:
+        dt = parse_iso_timestamp(ts).astimezone(LOCAL_TZ)
+        time_str = dt.strftime("%H:%M")
+    else:
+        time_str = datetime.now(LOCAL_TZ).strftime("%H:%M")
+
+    stem = output_file.stem
+    line = f"- {time_str} [[{stem}]] — {title}"
+    if project:
+        line += f" ([[{project}]])"
+
+    try:
+        daily_dir.mkdir(parents=True, exist_ok=True)
+
+        if not daily_path.exists():
+            daily_path.write_text(f"{_DAILY_SECTION}\n{line}\n", encoding="utf-8")
+            return True
+
+        content = daily_path.read_text(encoding="utf-8")
+
+        # Replace existing line for this session (update on re-sync)
+        existing_pattern = re.compile(rf"^- \d{{2}}:\d{{2}} \[\[{re.escape(stem)}\]\].*$", re.MULTILINE)
+        if existing_pattern.search(content):
+            content = existing_pattern.sub(line, content)
+            daily_path.write_text(content, encoding="utf-8")
+            return True
+
+        # Append to existing section
+        if _DAILY_SECTION in content:
+            section_re = re.compile(rf"({re.escape(_DAILY_SECTION)}\n(?:- .+\n)*)")
+            match = section_re.search(content)
+            if match:
+                new_section = match.group(1) + line + "\n"
+                content = section_re.sub(new_section, content)
+                daily_path.write_text(content, encoding="utf-8")
+                return True
+
+        # No section yet — append one
+        separator = "\n" if content and not content.endswith("\n") else ""
+        extra = "" if content.endswith("\n\n") or not content.strip() else "\n"
+        daily_path.write_text(
+            content + separator + extra + f"{_DAILY_SECTION}\n{line}\n",
+            encoding="utf-8",
+        )
+        return True
+    except OSError:
+        return False
+
+
 def _update_session_file(session_id: str, updater: Callable[[str, dict], str | None]) -> bool:
     """Find session file, read, apply updater(content, fm) -> new_content, write back."""
     session_file = find_session_file(session_id)
@@ -934,7 +995,13 @@ def cmd_sync(args):
         # No session_id is normal on first prompt or when stdin is unavailable
         return 0
 
-    sync_session(session_id, transcript_path, quiet=args.quiet)
+    output_file = sync_session(session_id, transcript_path, quiet=args.quiet)
+
+    if args.daily_append and output_file:
+        records = parse_jsonl(Path(transcript_path) if transcript_path else LOCAL_SESSIONS_DIR / f"{session_id}.jsonl")
+        data = extract_session_data(records)
+        _daily_append(data, output_file)
+
     return 0
 
 
@@ -1148,6 +1215,7 @@ def main():
     p_sync = subparsers.add_parser("sync", help="Sync session (hook or explicit)")
     p_sync.add_argument("--session-id", help="Session ID")
     p_sync.add_argument("--transcript", help="Transcript file path")
+    p_sync.add_argument("--daily-append", action="store_true", help="Append summary to Obsidian daily note")
     p_sync.set_defaults(func=cmd_sync)
 
     # export

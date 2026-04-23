@@ -66,7 +66,13 @@ The Claude-Sessions markdown contains the full conversation, artifacts (created/
 If user says "컨텍스트 줘", "이어서 하고 싶어", "resume", or wants to continue past work → use deep context.
 If user just wants to browse what happened → use quick expand.
 
-## Step 2B: Topic Recall (ir BM25 with Korean Support)
+## Step 2B: Topic Recall
+
+Two search backends available: **ir** (BM25, requires setup) and **Obsidian search** (built-in, always available if `$OBSIDIAN_CLI` is set).
+
+**Strategy:** Try ir first (better ranking). If ir is not installed or returns no results, fall back to Obsidian search. If both are available, use ir as primary and Obsidian search to supplement sparse results.
+
+### Path A: ir BM25 (primary, if installed)
 
 BM25 is keyword-based - it only finds exact word matches. The user's recall of a topic often uses different words than the session itself. Fix: expand the query into 3-4 keyword variants covering synonyms and related phrasings.
 
@@ -89,7 +95,39 @@ Run all variants in parallel for fast response.
 
 **Step 2B.3: Deduplicate results** by document path. If same doc appears in multiple searches, keep the highest score. Present top 5 unique results.
 
+**If ir returns < 3 results**, supplement with Obsidian search (Path B below).
+
 **Project filter:** If the user specifies both a topic and a project (e.g., "recall auth in triton"), run `ir search` normally, then filter results by reading the frontmatter `projects` field of matched files. Only present results where the project name matches.
+
+### Path B: Obsidian Search (fallback / supplement)
+
+Uses the Obsidian desktop CLI to search the entire vault. Always available when Obsidian is running and `$OBSIDIAN_CLI` is set. Searches all notes (not just sessions), which can surface related docs, save-doc outputs, and daily notes.
+
+**Step 2B-alt.1: Run Obsidian search:**
+
+```bash
+. ~/.claude/env && "$OBSIDIAN_CLI" search query="QUERY" limit=10
+```
+
+The CLI must run from a Windows-accessible path (prefix with `cd /mnt/c &&` in WSL):
+
+```bash
+. ~/.claude/env && cd /mnt/c && "$OBSIDIAN_CLI" search query="QUERY" limit=10
+```
+
+**Step 2B-alt.2: For bilingual coverage**, run two searches (original language + translation):
+
+```bash
+. ~/.claude/env && cd /mnt/c && "$OBSIDIAN_CLI" search query="KOREAN_QUERY" limit=10
+. ~/.claude/env && cd /mnt/c && "$OBSIDIAN_CLI" search query="ENGLISH_QUERY" limit=10
+```
+
+**Step 2B-alt.3: Read top results** using the Read tool. Obsidian search returns file paths relative to vault root — resolve to absolute path: `$VAULT_DIR/PATH`.
+
+**When to use Obsidian search over ir:**
+- ir is not installed → Obsidian search is the only option
+- ir returns sparse results (< 3 hits) → supplement with Obsidian search
+- Query targets non-session content (save-doc outputs, daily notes, general vault notes) → Obsidian search covers the whole vault
 
 ## Step 3: Fetch Full Documents (Topic path only)
 

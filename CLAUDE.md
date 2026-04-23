@@ -17,6 +17,7 @@ skills/
   sync-claude-sessions/
     SKILL.md                             — Session export skill
     scripts/update-title.py              — Title update script
+    scripts/backfill-daily.py            — Backfill sessions into Obsidian daily notes
     scripts/claude-sessions              — Main sync script
     schema/tags.yaml                     — Tag schema
     workflows/setup.md                   — Setup guide
@@ -44,6 +45,7 @@ ln -s "$(pwd)/skills/"* ~/.claude/skills/
 ## CLI Commands
 
 - `scripts/claude-sessions {sync|export|resume|note|close|list|log}` — session management
+- `scripts/backfill-daily.py [--dry-run] [--date YYYY-MM-DD]` — backfill sessions into daily notes
 - `scripts/recall-day.py` — date-based temporal recall
 - `scripts/session-graph.py` — graph visualization (needs `networkx`, `pyvis`)
 - Recall modes: temporal / project / topic (BM25 via `ir`) / graph
@@ -64,6 +66,7 @@ Skills depend on `~/.claude/env` for vault paths:
 - `DOCS_DIR` — Document output for save-doc
 - `CLAUDE_SESSIONS_TZ` — Timezone for session timestamps (default: `Asia/Seoul`)
 - `MACHINE_NAME` — Machine identifier in session frontmatter
+- `OBSIDIAN_CLI` — Path to Obsidian desktop CLI (enables `--daily-append` in sync)
 
 ## Python Scripts
 

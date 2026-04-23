@@ -90,7 +90,28 @@ Resolve the full path first, then save with the Write tool:
 
 Then use the Write tool to create the file at the resolved absolute path.
 
-## Step 5: Confirm Save
+## Step 5: Set Obsidian Properties (if OBSIDIAN_CLI is available)
+
+After writing the file, tag it with Obsidian properties for discoverability:
+
+```bash
+. ~/.claude/env && cd /mnt/c && "$OBSIDIAN_CLI" property:set name="type" value="doc" path="VAULT_RELATIVE_PATH"
+. ~/.claude/env && cd /mnt/c && "$OBSIDIAN_CLI" property:set name="date" value="YYYY-MM-DD" path="VAULT_RELATIVE_PATH"
+. ~/.claude/env && cd /mnt/c && "$OBSIDIAN_CLI" property:set name="project" value="PROJECT_NAME" path="VAULT_RELATIVE_PATH"
+```
+
+`VAULT_RELATIVE_PATH` = path relative to vault root (e.g., `workspace/cochl/benchmark/file.md`).
+`PROJECT_NAME` = infer from folder structure or session context.
+
+**Property rules:**
+- `type`: always `doc`
+- `date`: the document date (YYYY-MM-DD)
+- `project`: project name if identifiable from path or context (skip if unclear)
+- `tags`: comma-separated content categories (e.g., `benchmark,performance`) — only if clearly applicable
+
+If `$OBSIDIAN_CLI` is not set or Obsidian is not running, skip this step silently.
+
+## Step 6: Confirm Save
 
 After saving, report:
 

@@ -12,7 +12,7 @@ Three modes: temporal (date-based session timeline), topic (BM25 search across i
 ## What It Does
 
 - **Temporal queries** ("yesterday", "last week", "what was I doing"): Scans native Claude Code JSONL files by date. Shows a table of sessions with time, message count, and first message. Expand any session for conversation details.
-- **Topic queries** ("authentication", "video work"): BM25 search across sessions in ir collections.
+- **Topic queries** ("authentication", "video work"): BM25 search via ir (primary) with Obsidian search fallback when ir is unavailable or results are sparse. Obsidian search covers the entire vault including non-session notes.
 - **Graph queries** ("graph yesterday", "graph last week"): Generates an interactive HTML graph showing sessions as nodes connected to files they touched. Sessions colored by day, files colored by folder. Clusters reveal related work streams, shared files show cross-session dependencies.
 - **Project queries** ("project triton", "project security last week"): Filters sessions by project name (substring match). Shows sessions from matching projects within a date range (default: last 14 days). Use `projects` subcommand to list all available projects.
 - **One Thing synthesis**: After presenting results, synthesizes the single most impactful next action based on what has momentum, what's blocked, and what's closest to done. Not generic - specific and actionable.
@@ -83,11 +83,12 @@ python3 ~/.claude/skills/recall/scripts/recall-day.py list DATE_EXPR
 python3 ~/.claude/skills/recall/scripts/recall-day.py expand SESSION_ID
 ```
 
-**Topic** (keyword queries → ir search with query expansion):
+**Topic** (keyword queries → ir search with query expansion, Obsidian search fallback):
 ```bash
 ir search "VARIANT_1" -c sessions -n 5 --mode bm25 --md
 ir search "VARIANT_2" -c sessions -n 5 --mode bm25 --md
-# Document fetch: use Read tool on file paths from search results
+# Fallback/supplement if ir unavailable or < 3 results:
+. ~/.claude/env && cd /mnt/c && "$OBSIDIAN_CLI" search query="QUERY" limit=10
 ```
 
 **Graph** (strip "graph" prefix, pass rest as DATE_EXPR):
