@@ -77,10 +77,12 @@ List available projects:
 
 ## Commands (MUST use these scripts - do NOT craft raw bash commands)
 
+**All commands MUST be prefixed with `. ~/.claude/env &&`** to inject `VAULT_DIR`, `VAULT_SESSIONS_DIR`.
+
 **Temporal** (date queries → recall-day.py):
 ```bash
-python3 ~/.claude/skills/recall/scripts/recall-day.py list DATE_EXPR
-python3 ~/.claude/skills/recall/scripts/recall-day.py expand SESSION_ID
+. ~/.claude/env && python3 ~/.claude/skills/recall/scripts/recall-day.py list DATE_EXPR
+. ~/.claude/env && python3 ~/.claude/skills/recall/scripts/recall-day.py expand SESSION_ID
 ```
 
 **Topic** (keyword queries → ir search with query expansion, Obsidian search fallback):
@@ -93,13 +95,13 @@ ir search "VARIANT_2" -c sessions -n 5 --mode bm25 --md
 
 **Graph** (strip "graph" prefix, pass rest as DATE_EXPR):
 ```bash
-python3 ~/.claude/skills/recall/scripts/session-graph.py DATE_EXPR
+. ~/.claude/env && python3 ~/.claude/skills/recall/scripts/session-graph.py DATE_EXPR
 ```
 
 **Project** (project queries → recall-day.py with --name):
 ```bash
-python3 ~/.claude/skills/recall/scripts/recall-day.py projects
-python3 ~/.claude/skills/recall/scripts/recall-day.py list DATE_EXPR --name PROJECT_NAME
+. ~/.claude/env && python3 ~/.claude/skills/recall/scripts/recall-day.py projects
+. ~/.claude/env && python3 ~/.claude/skills/recall/scripts/recall-day.py list DATE_EXPR --name PROJECT_NAME
 ```
 
 ## Workflow

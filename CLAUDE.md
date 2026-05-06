@@ -55,7 +55,8 @@ All scripts are invoked from their installed path: `. ~/.claude/env && python ~/
 ## Skill Conventions
 
 - Each skill lives in `skills/<name>/SKILL.md`
-- Frontmatter: `name` and `description` only (max 1024 chars total)
+- Frontmatter: `name`, `description` required; optional fields: `argument-hint`, `allowed-tools`, `when_to_use`, `disable-model-invocation`, `user-invocable`, `model`, `effort`, `context`, `agent`, `hooks`, `paths`, `shell`
+- `description` + `when_to_use` combined: max 1536 chars (truncated by Claude Code for context budget)
 - `description` starts with "Use when..." — trigger conditions only, no workflow summary
 - Scripts go in `skills/<name>/scripts/`
 - Keep skills under 500 words for token efficiency

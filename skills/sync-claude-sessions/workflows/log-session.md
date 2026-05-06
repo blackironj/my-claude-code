@@ -4,7 +4,7 @@ Annotate the current session with title, tags, status, rating, comments, and aut
 
 ## Behavior
 
-- **Always generates summary** via haiku subagent (analyzes conversation)
+- **Always generates summary** via Agent tool with `model: "haiku"` (analyzes conversation)
 - Reads valid tags from `schema/tags.yaml`
 - Updates frontmatter via **Obsidian CLI** (atomic, no file read needed)
 - Fields: title, tags, status, rating, comments, summary
@@ -21,7 +21,7 @@ Claude:
    - rating: 8
    - comment: (auto-generated from context)
 2. Reads `schema/tags.yaml` to validate tags
-3. Runs haiku subagent to generate 2-3 line summary
+3. Runs Agent tool with `model: "haiku"` to generate 2-3 line summary
 4. **Updates via Obsidian CLI** (see below)
 
 ### Example Inputs
@@ -45,17 +45,16 @@ Claude:
 **Primary method** - atomic update, no file read race conditions:
 
 ```bash
-# Update individual fields
-obsidian property:set path="Claude-Sessions/2026-02-05-XXXXXXXX.md" name="title" value="New Title" type=text
-obsidian property:set path="Claude-Sessions/2026-02-05-XXXXXXXX.md" name="status" value="done" type=text
-obsidian property:set path="Claude-Sessions/2026-02-05-XXXXXXXX.md" name="tags" value='["implementation", "automation"]' type=list
-obsidian property:set path="Claude-Sessions/2026-02-05-XXXXXXXX.md" name="rating" value="8" type=number
+. ~/.claude/env && cd /mnt/c && "$OBSIDIAN_CLI" property:set path="Claude-Sessions/2026-02-05-XXXXXXXX.md" name="title" value="New Title" type=text
+. ~/.claude/env && cd /mnt/c && "$OBSIDIAN_CLI" property:set path="Claude-Sessions/2026-02-05-XXXXXXXX.md" name="status" value="done" type=text
+. ~/.claude/env && cd /mnt/c && "$OBSIDIAN_CLI" property:set path="Claude-Sessions/2026-02-05-XXXXXXXX.md" name="tags" value='["implementation", "automation"]' type=list
+. ~/.claude/env && cd /mnt/c && "$OBSIDIAN_CLI" property:set path="Claude-Sessions/2026-02-05-XXXXXXXX.md" name="rating" value="8" type=number
 ```
 
 **Add comment** (append to existing - use eval for complex logic):
 
 ```bash
-obsidian eval code="(async()=>{const f=app.vault.getAbstractFileByPath('Claude-Sessions/2026-02-05-XXXXXXXX.md');const ts=new Date().toISOString().slice(0,16).replace('T',' ');await app.fileManager.processFrontMatter(f,fm=>{const c=fm.comments||'';fm.comments=c?c+'\\n['+ts+'] New comment':'['+ts+'] New comment'});return 'updated'})()"
+. ~/.claude/env && cd /mnt/c && "$OBSIDIAN_CLI" eval code="(async()=>{const f=app.vault.getAbstractFileByPath('Claude-Sessions/2026-02-05-XXXXXXXX.md');const ts=new Date().toISOString().slice(0,16).replace('T',' ');await app.fileManager.processFrontMatter(f,fm=>{const c=fm.comments||'';fm.comments=c?c+'\\n['+ts+'] New comment':'['+ts+'] New comment'});return 'updated'})()"
 ```
 
 ## Via CLI

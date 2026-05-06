@@ -52,8 +52,9 @@ Edit `~/.claude/settings.json` and add the hooks:
         "hooks": [
           {
             "type": "command",
-            "command": ". ~/.claude/env && python ~/.claude/skills/sync-claude-sessions/scripts/claude-sessions sync",
-            "timeout": 10
+            "command": ". ~/.claude/env && python ~/.claude/skills/sync-claude-sessions/scripts/claude-sessions sync --daily-append",
+            "timeout": 15,
+            "async": true
           }
         ]
       }
@@ -63,8 +64,8 @@ Edit `~/.claude/settings.json` and add the hooks:
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.claude/hooks/index-sessions.sh >> ~/.claude/hooks/index-sessions.log 2>&1",
-            "timeout": 30
+            "command": "nohup bash ~/.claude/hooks/index-sessions.sh >> ~/.claude/hooks/index-sessions.log 2>&1 &",
+            "timeout": 5
           }
         ]
       }
